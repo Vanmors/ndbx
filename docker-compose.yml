@@ -3,11 +3,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    environment:
+      - SERVER_PORT=${SERVER_PORT}
     ports:
-      - "${APP_PORT}:${APP_PORT}"
+      - "${SERVER_PORT}:${SERVER_PORT}"
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "wget", "--spider", "-q", "http://${APP_HOST}:${APP_PORT}/health" ]
+      test: [ "CMD", "wget", "--spider", "-q", "http://${SERVER_HOST}:${SERVER_PORT}/health" ]
       interval: 10s
       timeout: 2s
       retries: 5

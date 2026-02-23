@@ -3,8 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    environment:
-      - SERVER_PORT=${SERVER_PORT}
+    env_file:
+      - .env.local
     ports:
       - "${SERVER_PORT}:${SERVER_PORT}"
     restart: unless-stopped

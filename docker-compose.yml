@@ -1,0 +1,15 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.local
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://${SERVER_HOST}:${SERVER_PORT}/health" ]
+      interval: 10s
+      timeout: 2s
+      retries: 5

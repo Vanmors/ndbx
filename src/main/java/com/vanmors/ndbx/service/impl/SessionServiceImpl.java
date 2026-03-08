@@ -10,10 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -90,8 +87,12 @@ public class SessionServiceImpl implements SessionService {
     }
 
     private static String generateSessionId() {
-        final byte[] randomBytes = new byte[32];
-        secureRandom.nextBytes(randomBytes);
-        return base64Encoder.encodeToString(randomBytes);
+        final byte[] randomBytes = new byte[16];
+        new SecureRandom().nextBytes(randomBytes);
+        final StringBuilder sb = new StringBuilder(32);
+        for (final byte b : randomBytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
     }
 }

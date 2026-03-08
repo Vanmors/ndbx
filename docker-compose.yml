@@ -13,3 +13,16 @@ services:
       interval: 10s
       timeout: 2s
       retries: 5
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: redis
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s

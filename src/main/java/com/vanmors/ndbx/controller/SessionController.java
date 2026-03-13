@@ -30,7 +30,7 @@ public class SessionController {
     public SessionController(
             final SessionService sessionService,
             @Value("${app.session.cookie-name:X-Session-Id}") final String cookieName,
-            @Value("${app.session.ttl-seconds:60}") final long ttlSeconds) {
+            @Value("${app.session.ttl-seconds}") final int ttlSeconds) {
         this.sessionService = sessionService;
         this.cookieName = cookieName;
         this.ttlSeconds = ttlSeconds;

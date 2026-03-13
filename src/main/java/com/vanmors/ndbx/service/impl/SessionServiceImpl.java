@@ -1,5 +1,6 @@
 package com.vanmors.ndbx.service.impl;
 
+import com.vanmors.ndbx.dao.SessionDao;
 import com.vanmors.ndbx.service.SessionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,9 +10,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.Optional;
+
 
 @Service
 public class SessionServiceImpl implements SessionService {
@@ -19,18 +19,22 @@ public class SessionServiceImpl implements SessionService {
 
     private static final SecureRandom secureRandom = new SecureRandom();
 
-    private static final Base64.Encoder base64Encoder = Base64.getUrlEncoder().withoutPadding();
-
     private final RedisTemplate<String, Object> redisTemplate;
+
+    private final SessionDao sessionDao;
+
     private final String sessionPrefix;
-    private final long ttlSeconds;
+
+    private final int ttlSeconds;
 
     @Autowired
     public SessionServiceImpl(
             final RedisTemplate<String, Object> redisTemplate,
-            @Value("${app.session.prefix}") final String sessionPrefix,
-            @Value("${app.session.ttl-seconds}") final long ttlSeconds) {
+            final SessionDao sessionDao,
+            @Value("${app.session.key_prefix}") final String sessionPrefix,
+            @Value("${app.session.ttl-seconds}") final int ttlSeconds) {
         this.redisTemplate = redisTemplate;
+        this.sessionDao = sessionDao;
         this.sessionPrefix = sessionPrefix;
         this.ttlSeconds = ttlSeconds;
     }
@@ -43,25 +47,27 @@ public class SessionServiceImpl implements SessionService {
             sid = generateSessionId();
             final String key = sessionPrefix + sid;
 
-            final Map<String, String> data = new HashMap<>();
-            final String now = Instant.now().toString();
-            data.put("created_at", now);
-            data.put("updated_at", now);
+            final boolean created = sessionDao.createSession(key, ttlSeconds);
 
-            redisTemplate.opsForHash().putAll(key, data);
-            redisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
+            if (!created) {
+                log.warn("Failed to create session for sid: {}", sid);
+                return null;
+            }
 
             log.debug("Created new session: {}", sid);
             return sid;
-        } else {
-            // Обновляем TTL и updated_at
-            final String key = sessionPrefix + sid;
-            redisTemplate.opsForHash().put(key, "updated_at", Instant.now().toString());
-            redisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
-
-            log.debug("Refreshed session: {}", sid);
-            return sid;
         }
+        // Обновляем TTL и updated_at
+        final String key = sessionPrefix + sid;
+        final boolean refreshed = sessionDao.refreshSession(key, ttlSeconds);
+
+        if (!refreshed) {
+            log.warn("Failed to refresh session for sid: {}", sid);
+            return null;
+        }
+
+        log.debug("Refreshed session: {}", sid);
+        return sid;
     }
 
     /**
@@ -88,7 +94,7 @@ public class SessionServiceImpl implements SessionService {
 
     private static String generateSessionId() {
         final byte[] randomBytes = new byte[16];
-        new SecureRandom().nextBytes(randomBytes);
+        secureRandom.nextBytes(randomBytes);
         final StringBuilder sb = new StringBuilder(32);
         for (final byte b : randomBytes) {
             sb.append(String.format("%02x", b));

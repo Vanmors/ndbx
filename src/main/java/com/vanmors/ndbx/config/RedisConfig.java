@@ -27,7 +27,7 @@ public class RedisConfig {
     private String password;
 
     @Value("${spring.data.redis.timeout}")
-    private long timeout;
+    private int timeout;
 
     @Bean
     public JedisConnectionFactory jedisConnectionFactory() {

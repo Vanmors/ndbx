@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 
 @Service
@@ -86,6 +87,28 @@ public class SessionServiceImpl implements SessionService {
             return Optional.of(sid);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public void attachUserToSession(final String sid, final String userId) {
+        final String key = sessionPrefix + sid;
+        redisTemplate.opsForHash().put(key, "user_id", userId);
+        redisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
+    }
+
+    @Override
+    public Optional<String> getUserIdFromSession(final String sid) {
+        if (sid == null || sid.isBlank()) {
+            return Optional.empty();
+        }
+        final String key = sessionPrefix + sid;
+        final String userId = (String) redisTemplate.opsForHash().get(key, "user_id");
+        return Optional.ofNullable(userId);
+    }
+
+    @Override
+    public void deleteSession(final String sid) {
+        redisTemplate.delete(sessionPrefix + sid);
     }
 
     private boolean exists(final String sid) {

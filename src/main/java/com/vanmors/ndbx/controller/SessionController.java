@@ -22,18 +22,12 @@ public class SessionController {
 
     private final SessionService sessionService;
 
-    private final String cookieName;
-
-    private final long ttlSeconds;
+    private final CookieBuilder cookieBuilder;
 
     @Autowired
-    public SessionController(
-            final SessionService sessionService,
-            @Value("${app.session.cookie-name:X-Session-Id}") final String cookieName,
-            @Value("${app.session.ttl-seconds}") final int ttlSeconds) {
+    public SessionController(final SessionService sessionService, final CookieBuilder cookieBuilder) {
         this.sessionService = sessionService;
-        this.cookieName = cookieName;
-        this.ttlSeconds = ttlSeconds;
+        this.cookieBuilder = cookieBuilder;
     }
 
     @PostMapping("/session")
@@ -41,12 +35,7 @@ public class SessionController {
 
         final String newOrUpdatedSid = sessionService.createOrRefreshSession(sessionId);
 
-        final ResponseCookie cookie = ResponseCookie.from(cookieName, newOrUpdatedSid)
-                .httpOnly(true)
-                .path("/")
-                .maxAge(Duration.ofSeconds(ttlSeconds))
-                .sameSite("Lax")
-                .build();
+        final ResponseCookie cookie = cookieBuilder.build(newOrUpdatedSid);
 
         final HttpStatus status = sessionId != null && sessionId.equals(newOrUpdatedSid) ? HttpStatus.OK : HttpStatus.CREATED;
 
@@ -64,12 +53,7 @@ public class SessionController {
         if (sessionId != null) {
             final Optional<String> existing = sessionService.getExistingSessionId(sessionId);
             if (existing.isPresent()) {
-                final ResponseCookie cookie = ResponseCookie.from(cookieName, existing.get())
-                        .httpOnly(true)
-                        .path("/")
-                        .maxAge(Duration.ofSeconds(ttlSeconds))
-                        .sameSite("Lax")
-                        .build();
+                final ResponseCookie cookie = cookieBuilder.build(existing.get());
 
                 return ResponseEntity.ok()
                         .header(HttpHeaders.SET_COOKIE, cookie.toString())

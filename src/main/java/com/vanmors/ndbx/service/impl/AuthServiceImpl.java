@@ -27,7 +27,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void login(final LoginDto dto, final String existingSid) {
+    public String login(final LoginDto dto, final String existingSid) {
         final User user = userRepository.findByUsername(dto.username())
                 .orElseThrow(() -> new UnauthorizedException("invalid credentials"));
 
@@ -38,10 +38,12 @@ public class AuthServiceImpl implements AuthService {
         // Привязываем сессию к пользователю
         final String sid = sessionService.createOrRefreshSession(existingSid);
         sessionService.attachUserToSession(sid, user.getId());
+        return sid;
     }
 
     @Override
     public void logout(final String sid) {
+        sessionService.getUserIdFromSession(sid).orElseThrow(() -> new UnauthorizedException("not authenticated"));
         sessionService.deleteSession(sid);
     }
 }

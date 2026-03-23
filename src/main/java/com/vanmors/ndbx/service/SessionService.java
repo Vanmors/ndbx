@@ -1,7 +1,5 @@
 package com.vanmors.ndbx.service;
 
-import com.vanmors.ndbx.entity.User;
-
 import java.util.Optional;
 
 

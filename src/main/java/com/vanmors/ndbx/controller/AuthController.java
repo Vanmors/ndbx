@@ -42,9 +42,7 @@ public class AuthController {
     public ResponseEntity<Void> logout(
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
 
-        if (sid != null) {
-            authService.logout(sid);
-        }
+        authService.logout(sid);
 
         final ResponseCookie cookie = ResponseCookie.from(cookieName, sid)
                 .httpOnly(true)

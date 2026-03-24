@@ -2,6 +2,7 @@ package com.vanmors.ndbx.controller;
 
 import com.vanmors.ndbx.dto.LoginDto;
 import com.vanmors.ndbx.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -30,7 +31,7 @@ public class AuthController {
 
     @PostMapping("login")
     public ResponseEntity<Void> login(
-            @RequestBody final LoginDto dto,
+            @Valid @RequestBody final LoginDto dto,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
 
         final String newSid = authService.login(dto, sid);

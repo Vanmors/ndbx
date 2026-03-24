@@ -2,6 +2,7 @@ package com.vanmors.ndbx.controller;
 
 import com.vanmors.ndbx.dto.RegisterDto;
 import com.vanmors.ndbx.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,7 +26,7 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<Void> register(@RequestBody final RegisterDto dto,
+    public ResponseEntity<Void> register(@Valid @RequestBody final RegisterDto dto,
                                          @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
         userService.createNewUser(dto, sid);
         final ResponseCookie cookie = cookieBuilder.build(sid);

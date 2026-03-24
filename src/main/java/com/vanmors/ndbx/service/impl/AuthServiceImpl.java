@@ -6,6 +6,7 @@ import com.vanmors.ndbx.entity.User;
 import com.vanmors.ndbx.service.AuthService;
 import com.vanmors.ndbx.service.SessionService;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +32,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public String login(final LoginDto dto, final String existingSid) {
+    public String login(@Valid final LoginDto dto, final String existingSid) {
         final User user = userRepository.findByUsername(dto.username())
                 .orElseThrow(() -> new UnauthorizedException("invalid credentials"));
 

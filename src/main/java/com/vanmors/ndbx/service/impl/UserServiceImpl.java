@@ -26,7 +26,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User createNewUser(final RegisterDto dto, final String existingSid) {
+    public String createNewUser(final RegisterDto dto, final String existingSid) {
         if (userRepository.existsByUsername(dto.username())) {
             throw new RegistrationException("user already exists");
         }
@@ -42,7 +42,7 @@ public class UserServiceImpl implements UserService {
         final String sid = sessionService.createOrRefreshSession(existingSid);
         sessionService.attachUserToSession(sid, saved.getId());
 
-        return saved;
+        return sid;
     }
 
 

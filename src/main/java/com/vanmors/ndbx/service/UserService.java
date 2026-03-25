@@ -6,5 +6,5 @@ import com.vanmors.ndbx.entity.User;
 
 public interface UserService {
 
-    User createNewUser(RegisterDto dto, String existingSid);
+    String createNewUser(RegisterDto dto, String existingSid);
 }

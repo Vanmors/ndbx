@@ -40,8 +40,8 @@ public class UserController {
 
         logRequestBody("POST /users", dto, request);
 
-        userService.createNewUser(dto, sid);
-        final ResponseCookie cookie = cookieBuilder.build(sid);
+        final String updatedSid = userService.createNewUser(dto, sid);
+        final ResponseCookie cookie = cookieBuilder.build(updatedSid);
 
         return ResponseEntity.status(HttpStatus.CREATED).header(HttpHeaders.SET_COOKIE, cookie.toString()).build();
     }

@@ -14,23 +14,23 @@ public class User {
 
     @Id
     private String id;
-    private String fullName;
+    private String full_name;
 
     @Indexed(unique = true)
     private String username;
-    private String passwordHashed;
+    private String password_hash;
     private Instant createdAt = Instant.now();
 
-    public void setFullName(final String fullName) {
-        this.fullName = fullName;
+    public void setFullName(final String full_name) {
+        this.full_name = full_name;
     }
 
     public void setUsername(final String username) {
         this.username = username;
     }
 
-    public void setPasswordHashed(final String passwordHashed) {
-        this.passwordHashed = passwordHashed;
+    public void setPasswordHashed(final String password_hash) {
+        this.password_hash = password_hash;
     }
 
     public void setCreatedAt(final Instant createdAt) {
@@ -38,7 +38,7 @@ public class User {
     }
 
     public String getFullName() {
-        return fullName;
+        return full_name;
     }
 
     public String getUsername() {
@@ -46,7 +46,7 @@ public class User {
     }
 
     public String getPasswordHashed() {
-        return passwordHashed;
+        return password_hash;
     }
 
     public Instant getCreatedAt() {

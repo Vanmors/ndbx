@@ -32,7 +32,7 @@ public class UserServiceImpl implements UserService {
         }
 
         final User user = new User();
-        user.setFullName(dto.fullName());
+        user.setFullName(dto.full_name());
         user.setUsername(dto.username());
         user.setPasswordHashed(passwordEncoder.encode(dto.password()));
 

@@ -33,7 +33,9 @@ public class EventServiceImpl implements EventService {
         );
 
         final Event.Location location = new Event.Location();
-        location.setAddress(eventDto.location().address());
+        if (eventDto.location() != null) {
+            location.setAddress(eventDto.location().address());
+        }
 
         final Event event = new Event();
         event.setTitle(eventDto.title());

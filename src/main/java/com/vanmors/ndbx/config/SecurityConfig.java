@@ -7,7 +7,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import tools.jackson.databind.ObjectMapper;
 
 
 @Configuration
@@ -29,10 +28,5 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable());     // отключаем форму логина
 
         return http.build();
-    }
-
-    @Bean
-    public ObjectMapper objectMapper() {
-        return new ObjectMapper();
     }
 }

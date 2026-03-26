@@ -5,11 +5,7 @@ import com.vanmors.ndbx.dto.EventDto;
 import com.vanmors.ndbx.entity.Event;
 import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.SessionService;
-import com.vanmors.ndbx.service.exception.UnauthorizedException;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Min;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -18,7 +14,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
@@ -27,31 +22,23 @@ import java.util.Map;
 @RequestMapping("/events")
 public class EventController {
 
-    private static final Logger log = LoggerFactory.getLogger(EventController.class);
-
     private final EventService eventService;
 
     private final SessionService sessionService;
 
     private final CookieBuilder cookieBuilder;
 
-    private final ObjectMapper objectMapper;
-
     @Autowired
-    public EventController(final EventService eventService, final SessionService sessionService, final CookieBuilder cookieBuilder, final ObjectMapper objectMapper) {
+    public EventController(final EventService eventService, final SessionService sessionService, final CookieBuilder cookieBuilder) {
         this.eventService = eventService;
         this.sessionService = sessionService;
         this.cookieBuilder = cookieBuilder;
-        this.objectMapper = objectMapper;
     }
 
     @PostMapping
     public ResponseEntity<Map<String, String>> create(
             @RequestBody final EventDto dto,
-            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
-            final HttpServletRequest request) {
-
-        logRequestBody("POST /events", dto, request);
+            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
@@ -81,14 +68,5 @@ public class EventController {
         return ResponseEntity.status(HttpStatus.OK)
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(new EventsResponse(page.getContent(), page.getTotalElements()));
-    }
-
-    private void logRequestBody(final String endpoint, final Object body, final HttpServletRequest request) {
-        try {
-            final String json = objectMapper.writeValueAsString(body);
-            log.info("[REQUEST] {} | Body: {}", endpoint, json);
-        } catch (final Exception e) {
-            log.warn("[REQUEST] {} | Failed to serialize body", endpoint);
-        }
     }
 }

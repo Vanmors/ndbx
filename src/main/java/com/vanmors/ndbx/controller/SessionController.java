@@ -2,7 +2,6 @@ package com.vanmors.ndbx.controller;
 
 import com.vanmors.ndbx.service.SessionService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -12,7 +11,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 

@@ -75,8 +75,6 @@ public class EventController {
             @Min(0) @RequestParam(name = "offset", defaultValue = "0") final int offset,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
 
-        sessionService.getUserIdFromSession(sid).orElseThrow(() -> new UnauthorizedException("not authenticated"));
-
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
         final Page<EventDto> page = eventService.findAll(title, limit, offset);

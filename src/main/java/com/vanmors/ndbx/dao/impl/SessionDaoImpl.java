@@ -41,7 +41,7 @@ public class SessionDaoImpl implements SessionDao {
             return conn.hashCommands().hSetEx(
                     keyBytes,
                     byteMap,
-                    RedisHashCommands.HashFieldSetOption.IF_ALL_EXIST,
+                    RedisHashCommands.HashFieldSetOption.UPSERT,
                     Expiration.seconds(ttlSeconds)
             );
         });

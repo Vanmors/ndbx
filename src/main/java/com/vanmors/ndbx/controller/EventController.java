@@ -51,9 +51,6 @@ public class EventController {
             final HttpServletRequest request) {
 
         logRequestBody("POST /events", dto, request);
-        if (sid == null || sessionService.getUserIdFromSession(sid).isEmpty()) {
-            throw new UnauthorizedException("not authenticated");
-        }
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
 

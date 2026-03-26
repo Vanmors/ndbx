@@ -33,15 +33,14 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public Event createEvent(final EventDto eventDto, final String sid) {
-        final String userId = sessionService.getUserIdFromSession(sid).orElseThrow(
-                () -> new UnauthorizedException("not authenticated")
-        );
-
-        log.info("userId {}", userId);
 
         if (eventRepository.countByTitleContainingIgnoreCase(eventDto.title()) > 0) {
             throw new DataIntegrityViolationException("event already exists");
         }
+
+        final String userId = sessionService.getUserIdFromSession(sid).orElseThrow(
+                () -> new UnauthorizedException("not authenticated")
+        );
 
         final Event.Location location = new Event.Location();
         if (eventDto.location() != null) {

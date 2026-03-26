@@ -3,6 +3,7 @@ package com.vanmors.ndbx.controller;
 import com.vanmors.ndbx.controller.response.ErrorResponse;
 import com.vanmors.ndbx.service.exception.RegistrationException;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -35,7 +36,15 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<ErrorResponse> handleUnauthorized() {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("invalid credentials"));
+    public ResponseEntity<ErrorResponse> handleUnauthorized(final UnauthorizedException ex, final HttpServletRequest request) {
+
+        final String path = request.getRequestURI();
+
+        if ("/auth/login".equals(path)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ErrorResponse("invalid credentials"));
+        }
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 }

@@ -10,6 +10,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -55,7 +56,7 @@ public class SessionServiceImpl implements SessionService {
                 return null;
             }
 
-            log.debug("Created new session: {}", sid);
+            log.info("Created new session: {}", sid);
             return sid;
         }
         // Обновляем TTL и updated_at
@@ -67,7 +68,7 @@ public class SessionServiceImpl implements SessionService {
             return null;
         }
 
-        log.debug("Refreshed session: {}", sid);
+        log.info("Refreshed session: {}, ttl: {}", sid, ttlSeconds);
         return sid;
     }
 
@@ -91,9 +92,22 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     public void attachUserToSession(final String sid, final String userId) {
+        if (sid == null || sid.isBlank() || userId == null) {
+            log.warn("Cannot attach user: sid or userId is null");
+            return;
+        }
+
         final String key = sessionPrefix + sid;
+        // Проверяем, существует ли сессия
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(key))) {
+            log.warn("Session {} does not exist. Cannot attach user {}", sid, userId);
+            return;
+        }
+
         redisTemplate.opsForHash().put(key, "user_id", userId);
+        redisTemplate.opsForHash().put(key, "updated_at", Instant.now().toString());
         redisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
+        log.debug("Attached userId {} to session {}", userId, sid);
     }
 
     @Override

@@ -28,9 +28,15 @@ public class SessionDaoImpl implements SessionDao {
         return redisTemplate.execute((final RedisConnection conn) -> {
             final byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
 
+            final byte[] createdAtBytes = conn.hashCommands().hGet(keyBytes, "created_at".getBytes(StandardCharsets.UTF_8));
+
             final Map<byte[], byte[]> byteMap = new HashMap<>();
-            final byte[] now = Instant.now().toString().getBytes(StandardCharsets.UTF_8);
-            byteMap.put("updated_at".getBytes(StandardCharsets.UTF_8), now);
+            byteMap.put("updated_at".getBytes(StandardCharsets.UTF_8),
+                    Instant.now().toString().getBytes(StandardCharsets.UTF_8));
+
+            if (createdAtBytes != null) {
+                byteMap.put("created_at".getBytes(StandardCharsets.UTF_8), createdAtBytes);
+            }
 
             return conn.hashCommands().hSetEx(
                     keyBytes,

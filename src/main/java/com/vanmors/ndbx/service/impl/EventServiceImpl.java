@@ -55,6 +55,8 @@ public class EventServiceImpl implements EventService {
         event.setFinishedAt(eventDto.finished_at());
         event.setCreatedBy(userId);
 
+        sessionService.createOrRefreshSession(sid);
+
         return eventRepository.save(event);
     }
 

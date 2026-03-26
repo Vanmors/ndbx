@@ -30,8 +30,8 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("invalid " + field + " field"));
     }
 
-    @ExceptionHandler({RegistrationException.class, DataIntegrityViolationException.class})
-    public ResponseEntity<ErrorResponse> handleConflict(final RuntimeException ex) {
+    @ExceptionHandler(RegistrationException.class)
+    public ResponseEntity<ErrorResponse> handleConflictRegistration(final RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 

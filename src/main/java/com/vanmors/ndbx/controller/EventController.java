@@ -8,10 +8,10 @@ import com.vanmors.ndbx.service.SessionService;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -34,6 +34,7 @@ public class EventController {
     private final SessionService sessionService;
 
     private final CookieBuilder cookieBuilder;
+
     private final ObjectMapper objectMapper;
 
     @Autowired
@@ -54,8 +55,17 @@ public class EventController {
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
-        final Event event = eventService.createEvent(dto, sid);
-        return ResponseEntity.status(HttpStatus.CREATED).header(HttpHeaders.SET_COOKIE, cookie.toString()).body(Map.of("id", event.getId()));
+        try {
+            final Event event = eventService.createEvent(dto, sid);
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("id", event.getId()));
+
+        } catch (DataIntegrityViolationException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", "event already exists"));
+        }
     }
 
     @GetMapping

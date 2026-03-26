@@ -19,7 +19,7 @@ public class User {
     @Indexed(unique = true)
     private String username;
     private String password_hash;
-    private Instant createdAt = Instant.now();
+    private Instant created_at = Instant.now();
 
     public void setFullName(final String full_name) {
         this.full_name = full_name;
@@ -33,8 +33,8 @@ public class User {
         this.password_hash = password_hash;
     }
 
-    public void setCreatedAt(final Instant createdAt) {
-        this.createdAt = createdAt;
+    public void setCreatedAt(final Instant created_at) {
+        this.created_at = created_at;
     }
 
     public String getFullName() {
@@ -50,6 +50,6 @@ public class User {
     }
 
     public Instant getCreatedAt() {
-        return createdAt;
+        return created_at;
     }
 }

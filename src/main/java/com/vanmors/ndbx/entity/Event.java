@@ -23,14 +23,14 @@ public class Event {
 
     private Location location;
 
-    private Instant createdAt = Instant.now();
+    private Instant created_at = Instant.now();
 
     @Indexed
-    private String createdBy;
+    private String created_by;
 
-    private Instant startedAt;
+    private Instant started_at;
 
-    private Instant finishedAt;
+    private Instant finished_at;
 
     @Indexed
     private List<String> participant_ids = new ArrayList<>();
@@ -72,35 +72,35 @@ public class Event {
     }
 
     public Instant getCreatedAt() {
-        return createdAt;
+        return created_at;
     }
 
-    public void setCreated_at(final Instant createdAt) {
-        this.createdAt = createdAt;
+    public void setCreated_at(final Instant created_at) {
+        this.created_at = created_at;
     }
 
     public String getCreatedBy() {
-        return createdBy;
+        return created_by;
     }
 
-    public void setCreatedBy(final String createdBy) {
-        this.createdBy = createdBy;
+    public void setCreatedBy(final String created_by) {
+        this.created_by = created_by;
     }
 
     public Instant getStartedAt() {
-        return startedAt;
+        return started_at;
     }
 
-    public void setStartedAt(final Instant startedAt) {
-        this.startedAt = startedAt;
+    public void setStartedAt(final Instant started_at) {
+        this.started_at = started_at;
     }
 
     public Instant getFinishedAt() {
-        return finishedAt;
+        return finished_at;
     }
 
-    public void setFinishedAt(final Instant finishedAt) {
-        this.finishedAt = finishedAt;
+    public void setFinishedAt(final Instant finished_at) {
+        this.finished_at = finished_at;
     }
 
     public List<String> getParticipant_ids() {

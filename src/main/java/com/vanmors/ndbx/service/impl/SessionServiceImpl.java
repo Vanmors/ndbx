@@ -10,9 +10,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.time.Instant;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 
 @Service
@@ -49,26 +47,14 @@ public class SessionServiceImpl implements SessionService {
             sid = generateSessionId();
             final String key = sessionPrefix + sid;
 
-            final boolean created = sessionDao.createSession(key, ttlSeconds);
-
-            if (!created) {
-                log.warn("Failed to create session for sid: {}", sid);
-                return null;
-            }
+            sessionDao.createSession(key, ttlSeconds);
 
             log.info("Created new session: {}", sid);
             return sid;
         }
         // Обновляем TTL и updated_at
         final String key = sessionPrefix + sid;
-        final boolean refreshed = sessionDao.refreshSession(key, ttlSeconds);
-
-        if (!refreshed) {
-            log.warn("Failed to refresh session for sid: {}", sid);
-            return null;
-        }
-
-        log.info("Refreshed session: {}, ttl: {}", sid, ttlSeconds);
+        sessionDao.refreshSession(key, ttlSeconds);
         return sid;
     }
 
@@ -104,9 +90,8 @@ public class SessionServiceImpl implements SessionService {
             return;
         }
 
-        redisTemplate.opsForHash().put(key, "user_id", userId);
-        redisTemplate.opsForHash().put(key, "updated_at", Instant.now().toString());
-        redisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
+        sessionDao.attachToUser(key, userId, ttlSeconds);
+
         log.debug("Attached userId {} to session {}", userId, sid);
     }
 

@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 
 @Repository
@@ -25,26 +26,15 @@ public class SessionDaoImpl implements SessionDao {
     }
 
     public Boolean refreshSession(final String key, final int ttlSeconds) {
-        return redisTemplate.execute((final RedisConnection conn) -> {
-            final byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
 
-            final byte[] createdAtBytes = conn.hashCommands().hGet(keyBytes, "created_at".getBytes(StandardCharsets.UTF_8));
+        final String createdAt = (String) redisTemplate.opsForHash().get(key, "created_at");
+        redisTemplate.opsForHash().put(key, "updated_at", Instant.now().toString());
+        if (createdAt != null) {
+            redisTemplate.opsForHash().put(key, "created_at", createdAt);
+        }
+        redisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
 
-            final Map<byte[], byte[]> byteMap = new HashMap<>();
-            byteMap.put("updated_at".getBytes(StandardCharsets.UTF_8),
-                    Instant.now().toString().getBytes(StandardCharsets.UTF_8));
-
-            if (createdAtBytes != null) {
-                byteMap.put("created_at".getBytes(StandardCharsets.UTF_8), createdAtBytes);
-            }
-
-            return conn.hashCommands().hSetEx(
-                    keyBytes,
-                    byteMap,
-                    RedisHashCommands.HashFieldSetOption.UPSERT,
-                    Expiration.seconds(ttlSeconds)
-            );
-        });
+        return true;
     }
 
     public Boolean createSession(final String key, final int ttlSeconds) {

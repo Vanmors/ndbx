@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<Void> handleUnauthorized() {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    public ResponseEntity<ErrorResponse> handleUnauthorized() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("invalid credentials"));
     }
 }

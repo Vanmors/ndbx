@@ -41,8 +41,8 @@ public class EventServiceImpl implements EventService {
         event.setTitle(eventDto.title());
         event.setDescription(eventDto.description());
         event.setLocation(location);
-        event.setStartedAt(eventDto.startedAt());
-        event.setFinishedAt(eventDto.finishedAt());
+        event.setStartedAt(eventDto.started_at());
+        event.setFinishedAt(eventDto.finished_at());
         event.setCreatedBy(userId);
 
         return eventRepository.save(event);

@@ -71,7 +71,7 @@ public class Event {
         this.location = location;
     }
 
-    public Instant getCreated_at() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 

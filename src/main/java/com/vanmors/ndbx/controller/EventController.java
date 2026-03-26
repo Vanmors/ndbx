@@ -20,6 +20,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Map;
+
 
 @RestController
 @RequestMapping("/events")
@@ -35,7 +37,7 @@ public class EventController {
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public EventController(final EventService eventService, final SessionService sessionService, final CookieBuilder cookieBuilder, ObjectMapper objectMapper) {
+    public EventController(final EventService eventService, final SessionService sessionService, final CookieBuilder cookieBuilder, final ObjectMapper objectMapper) {
         this.eventService = eventService;
         this.sessionService = sessionService;
         this.cookieBuilder = cookieBuilder;
@@ -43,10 +45,10 @@ public class EventController {
     }
 
     @PostMapping
-    public ResponseEntity<EventDto> create(
+    public ResponseEntity<Map<String, String>> create(
             @RequestBody final EventDto dto,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
-            HttpServletRequest request) {
+            final HttpServletRequest request) {
 
         logRequestBody("POST /events", dto, request);
         if (sid == null || sessionService.getUserIdFromSession(sid).isEmpty()) {
@@ -56,14 +58,14 @@ public class EventController {
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
         final Event event = eventService.createEvent(dto, sid);
-        return ResponseEntity.status(HttpStatus.CREATED).header(HttpHeaders.SET_COOKIE, cookie.toString()).body(EventDto.fromEntity(event));
+        return ResponseEntity.status(HttpStatus.CREATED).header(HttpHeaders.SET_COOKIE, cookie.toString()).body(Map.of("id", event.getId()));
     }
 
     @GetMapping
     public ResponseEntity<EventsResponse> findAll(
-            @NotNull @RequestParam(required = false) final String title,
-            @Min(0) @NotNull @RequestParam(defaultValue = "10") final int limit,
-            @Min(0) @NotNull @RequestParam(defaultValue = "0") final int offset,
+            @RequestParam(name = "title", required = false) final String title,
+            @Min(0) @RequestParam(name = "limit", defaultValue = "10") final int limit,
+            @Min(0) @RequestParam(name = "offset", defaultValue = "0") final int offset,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
 
         sessionService.getUserIdFromSession(sid).orElseThrow(() -> new UnauthorizedException("not authenticated"));
@@ -76,11 +78,11 @@ public class EventController {
                 .body(new EventsResponse(page.getContent(), page.getTotalElements()));
     }
 
-    private void logRequestBody(String endpoint, Object body, HttpServletRequest request) {
+    private void logRequestBody(final String endpoint, final Object body, final HttpServletRequest request) {
         try {
-            String json = objectMapper.writeValueAsString(body);
+            final String json = objectMapper.writeValueAsString(body);
             log.info("[REQUEST] {} | Body: {}", endpoint, json);
-        } catch (Exception e) {
+        } catch (final Exception e) {
             log.warn("[REQUEST] {} | Failed to serialize body", endpoint);
         }
     }

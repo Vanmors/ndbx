@@ -2,16 +2,12 @@ package com.vanmors.ndbx.dao.impl;
 
 import com.vanmors.ndbx.dao.SessionDao;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.connection.RedisConnection;
-import org.springframework.data.redis.connection.RedisHashCommands;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.types.Expiration;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
 
 
 @Repository
@@ -24,39 +20,73 @@ public class SessionDaoImpl implements SessionDao {
         this.redisTemplate = redisTemplate;
     }
 
-    public Boolean refreshSession(final String key, final int ttlSeconds) {
-        return redisTemplate.execute((final RedisConnection conn) -> {
-            final byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+    public void refreshSession(final String key, final int ttlSeconds) {
 
-            final Map<byte[], byte[]> byteMap = new HashMap<>();
-            final byte[] now = Instant.now().toString().getBytes(StandardCharsets.UTF_8);
-            byteMap.put("updated_at".getBytes(StandardCharsets.UTF_8), now);
+        final String refreshSession = """
+                if redis.call('EXISTS', KEYS[1]) == 0 then
+                    return 0
+                end
+                redis.call('HSET', KEYS[1], 'updated_at', ARGV[1])
+                redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+                return 1
+                """;
 
-            return conn.hashCommands().hSetEx(
-                    keyBytes,
-                    byteMap,
-                    RedisHashCommands.HashFieldSetOption.IF_ALL_EXIST,
-                    Expiration.seconds(ttlSeconds)
-            );
-        });
+        final DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptText(refreshSession);
+        script.setResultType(Long.class);
+
+        redisTemplate.execute(
+                script,
+                Collections.singletonList(key),
+                Instant.now().toString(),
+                String.valueOf(ttlSeconds)
+        );
     }
 
-    public Boolean createSession(final String key, final int ttlSeconds) {
-        return redisTemplate.execute((final RedisConnection conn) -> {
-            final byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+    public void attachToUser(String key, String userId, int ttlSeconds) {
+        final String attachToUser = """
+                if redis.call('EXISTS', KEYS[1]) == 0 then
+                    return 0
+                end
+                redis.call('HSET', KEYS[1], 'user_id', ARGV[1], 'updated_at', ARGV[2])
+                redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
+                return 1
+                """;
 
-            final Map<byte[], byte[]> byteMap = new HashMap<>();
-            final byte[] now = Instant.now().toString().getBytes(StandardCharsets.UTF_8);
-            byteMap.put("created_at".getBytes(StandardCharsets.UTF_8), now);
-            byteMap.put("updated_at".getBytes(StandardCharsets.UTF_8), now);
 
-            return conn.hashCommands().hSetEx(
-                    keyBytes,
-                    byteMap,
-                    RedisHashCommands.HashFieldSetOption.IF_NONE_EXIST,
-                    Expiration.seconds(ttlSeconds)
-            );
-        });
+        final DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptText(attachToUser);
+        script.setResultType(Long.class);
+
+        redisTemplate.execute(
+                script,
+                Collections.singletonList(key),
+                userId,
+                Instant.now().toString(),
+                String.valueOf(ttlSeconds)
+        );
+    }
+
+    public void createSession(final String key, final int ttlSeconds) {
+        final String createSession = """ 
+                if redis.call('EXISTS', KEYS[1]) == 1 then
+                return 0
+                end
+                redis.call('HSET', KEYS[1], 'created_at', ARGV[1], 'updated_at', ARGV[1])
+                redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+                return 1
+                """;
+
+        final DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptText(createSession);
+        script.setResultType(Long.class);
+
+        redisTemplate.execute(
+                script,
+                Collections.singletonList(key),
+                Instant.now().toString(),
+                String.valueOf(ttlSeconds)
+        );
     }
 
 }

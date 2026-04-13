@@ -13,6 +13,11 @@ services:
       interval: 10s
       timeout: 2s
       retries: 5
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   redis:
     image: redis:8.0-alpine
@@ -26,3 +31,20 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+
+  mongodb:
+    image: mongo:8.0
+    container_name: mongodb
+    ports:
+      - "${MONGODB_PORT}:${MONGODB_PORT}"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE}
+    restart: unless-stopped
+    command: mongod --quiet --logpath /dev/null
+    healthcheck:
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5

@@ -47,26 +47,14 @@ public class SessionServiceImpl implements SessionService {
             sid = generateSessionId();
             final String key = sessionPrefix + sid;
 
-            final boolean created = sessionDao.createSession(key, ttlSeconds);
+            sessionDao.createSession(key, ttlSeconds);
 
-            if (!created) {
-                log.warn("Failed to create session for sid: {}", sid);
-                return null;
-            }
-
-            log.debug("Created new session: {}", sid);
+            log.info("Created new session: {}", sid);
             return sid;
         }
         // Обновляем TTL и updated_at
         final String key = sessionPrefix + sid;
-        final boolean refreshed = sessionDao.refreshSession(key, ttlSeconds);
-
-        if (!refreshed) {
-            log.warn("Failed to refresh session for sid: {}", sid);
-            return null;
-        }
-
-        log.debug("Refreshed session: {}", sid);
+        sessionDao.refreshSession(key, ttlSeconds);
         return sid;
     }
 
@@ -86,6 +74,40 @@ public class SessionServiceImpl implements SessionService {
             return Optional.of(sid);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public void attachUserToSession(final String sid, final String userId) {
+        if (sid == null || sid.isBlank() || userId == null) {
+            log.warn("Cannot attach user: sid or userId is null");
+            return;
+        }
+
+        final String key = sessionPrefix + sid;
+        // Проверяем, существует ли сессия
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(key))) {
+            log.warn("Session {} does not exist. Cannot attach user {}", sid, userId);
+            return;
+        }
+
+        sessionDao.attachToUser(key, userId, ttlSeconds);
+
+        log.debug("Attached userId {} to session {}", userId, sid);
+    }
+
+    @Override
+    public Optional<String> getUserIdFromSession(final String sid) {
+        if (sid == null || sid.isBlank()) {
+            return Optional.empty();
+        }
+        final String key = sessionPrefix + sid;
+        final String userId = (String) redisTemplate.opsForHash().get(key, "user_id");
+        return Optional.ofNullable(userId);
+    }
+
+    @Override
+    public void deleteSession(final String sid) {
+        redisTemplate.delete(sessionPrefix + sid);
     }
 
     private boolean exists(final String sid) {

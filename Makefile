@@ -13,7 +13,7 @@ rund:
 # Shows all service statuses.
 .PHONY: services
 services:
-	docker compose ps
+	docker compose --env-file .env.local ps
 
 # Stops all running services.
 .PHONY: stop
@@ -23,4 +23,4 @@ stop:
 # Cleans up all resources including volumes.
 .PHONY: clean
 clean:
-	docker compose down -v
+	docker compose --env-file .env.local down -v

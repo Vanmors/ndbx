@@ -16,8 +16,12 @@ public class Event {
     @Id
     private String id;
 
-    @Indexed(unique = true)
+//    @Indexed(unique = true)
     private String title;
+
+    private Category category;
+
+    private Long price;
 
     private String description;
 
@@ -53,6 +57,22 @@ public class Event {
 
     public void setTitle(final String title) {
         this.title = title;
+    }
+
+    public Category getCategory() {
+        return category;
+    }
+
+    public void setCategory(final Category category) {
+        this.category = category;
+    }
+
+    public Long getPrice() {
+        return price;
+    }
+
+    public void setPrice(final Long price) {
+        this.price = price;
     }
 
     public String getDescription() {
@@ -114,6 +134,8 @@ public class Event {
     public static class Location {
         private String address;
 
+        private String city;
+
         public Location() {
         }
 
@@ -123,6 +145,14 @@ public class Event {
 
         public void setAddress(final String address) {
             this.address = address;
+        }
+
+        public void setCity(final String city) {
+            this.city = city;
+        }
+
+        public String getCity() {
+            return city;
         }
     }
 }

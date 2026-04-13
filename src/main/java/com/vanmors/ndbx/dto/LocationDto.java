@@ -1,3 +1,3 @@
 package com.vanmors.ndbx.dto;
 
-public record LocationDto(String address) {}
+public record LocationDto(String city, String address) {}

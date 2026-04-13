@@ -33,25 +33,19 @@ public class MongoConfig extends AbstractMongoClientConfiguration {
     private String password;
 
     @Bean
+    @Override
     public MongoClient mongoClient() {
-        final StringBuilder uri = new StringBuilder("mongodb://");
+        final String uri = String.format(
+                "mongodb://%s:%s@%s:%d/%s?authSource=%s&retryWrites=true",
+                username,
+                password,
+                host,
+                port,
+                database,
+                database
+        );
 
-        if (!username.isEmpty() && !password.isEmpty()) {
-            uri.append(username).append(":").append(password).append("@");
-        }
-
-        uri.append(host).append(":").append(port).append("/").append(database);
-
-        if (!username.isEmpty()) {
-            uri.append("?authSource=admin");
-        }
-
-        final String connectionString = uri.toString();
-        log.info("MongoDB connection string: {}", connectionString.replace(password, "****"));
-
-        return MongoClients.create(MongoClientSettings.builder()
-                .applyConnectionString(new ConnectionString(connectionString))
-                .build());
+        return MongoClients.create(uri);
     }
 
     @Bean

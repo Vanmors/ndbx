@@ -11,12 +11,11 @@ import java.util.List;
 
 
 @Document(collection = "events")
-@CompoundIndex(def = "{'title': 1, 'created_by': 1}")
+@CompoundIndex(name = "title_created_by_unique", def = "{'created_by': 1, 'title': 1}", unique = true)
 public class Event {
     @Id
     private String id;
 
-//    @Indexed(unique = true)
     private String title;
 
     private Category category;
@@ -29,7 +28,7 @@ public class Event {
 
     private Instant created_at = Instant.now();
 
-    @Indexed
+    @Indexed(name = "created_by_1")
     private String created_by;
 
     private Instant started_at;

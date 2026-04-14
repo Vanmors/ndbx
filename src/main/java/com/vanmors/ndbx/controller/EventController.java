@@ -9,6 +9,8 @@ import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.SessionService;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
 import jakarta.validation.constraints.Min;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -24,6 +26,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/events")
 public class EventController {
+
+    private static final Logger log = LoggerFactory.getLogger(EventController.class);
 
     private final EventService eventService;
 

@@ -126,26 +126,34 @@ public class EventServiceImpl implements EventService {
             query.addCriteria(Criteria.where("category").is(category));
         }
 
+        Criteria criteriaPrice = Criteria.where("price");
+
         if (priceFrom != null) {
-            query.addCriteria(Criteria.where("price").gte(priceFrom));
+            criteriaPrice = criteriaPrice.gte(priceFrom);
         }
         if (priceTo != null) {
-            query.addCriteria(Criteria.where("price").lte(priceTo));
+            criteriaPrice = criteriaPrice.lte(priceTo);
         }
+
+        query.addCriteria(criteriaPrice);
 
         if (StringUtils.hasText(city)) {
             query.addCriteria(Criteria.where("location.city").is(city));
         }
 
+        Criteria criteriaDate = Criteria.where("started_at");
+
         if (StringUtils.hasText(dateFrom)) {
             final Instant from = DateUtils.parseDateFromYYYYMMDD(dateFrom);
-            query.addCriteria(Criteria.where("started_at").gte(from));
+            criteriaDate = criteriaDate.gte(from);
         }
 
         if (StringUtils.hasText(dateTo)) {
             final Instant to = DateUtils.parseDateFromYYYYMMDD(dateTo);
-            query.addCriteria(Criteria.where("started_at").lte(to));
+            criteriaDate = criteriaDate.lte(to);
         }
+
+        query.addCriteria(criteriaDate);
 
         final Optional<User> foundedUser = userService.findByUsername(user);
         if (StringUtils.hasText(user) && foundedUser.isPresent()) {

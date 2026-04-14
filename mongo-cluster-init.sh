@@ -79,7 +79,7 @@ sh.enableSharding(dbName);
 try {
   sh.shardCollection(
     `${dbName}.events`,
-    { created_by: "hashed" },
+    { created_by: 1 },
     false,
     { numInitialChunks: 8 }
   );

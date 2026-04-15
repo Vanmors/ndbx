@@ -11,11 +11,12 @@ import java.util.List;
 
 
 @Document(collection = "events")
-@CompoundIndex(name = "title_created_by_unique", def = "{'created_by': 1, 'title': 1}", unique = true)
+@CompoundIndex(def = "{'title': 1, 'created_by': 1}")
 public class Event {
     @Id
     private String id;
 
+    @Indexed
     private String title;
 
     private Category category;

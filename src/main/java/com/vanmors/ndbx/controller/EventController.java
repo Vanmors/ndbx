@@ -8,6 +8,7 @@ import com.vanmors.ndbx.entity.Event;
 import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.SessionService;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Min;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
@@ -29,6 +31,8 @@ public class EventController {
 
     private static final Logger log = LoggerFactory.getLogger(EventController.class);
 
+    private final ObjectMapper objectMapper;
+
     private final EventService eventService;
 
     private final SessionService sessionService;
@@ -36,18 +40,23 @@ public class EventController {
     private final CookieBuilder cookieBuilder;
 
     @Autowired
-    public EventController(final EventService eventService, final SessionService sessionService, final CookieBuilder cookieBuilder) {
+    public EventController(final EventService eventService, final SessionService sessionService, final CookieBuilder cookieBuilder, final ObjectMapper objectMapper) {
         this.eventService = eventService;
         this.sessionService = sessionService;
         this.cookieBuilder = cookieBuilder;
+        this.objectMapper = objectMapper;
+
     }
 
     @PostMapping
     public ResponseEntity<Map<String, String>> create(
             @RequestBody final EventDto dto,
-            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
+            final HttpServletRequest request) {
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
+
+        logRequest("Post /events/", dto, sid, request);
 
         try {
             final Event event = eventService.createEvent(dto, sid);
@@ -74,7 +83,10 @@ public class EventController {
             @RequestParam(name = "user", required = false) final String user,
             @Min(0) @RequestParam(name = "limit", defaultValue = "10") final int limit,
             @Min(0) @RequestParam(name = "offset", defaultValue = "0") final int offset,
-            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
+            final HttpServletRequest request) {
+
+        logRequest("GET /events/", null, sid, request);
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
@@ -91,7 +103,10 @@ public class EventController {
     public ResponseEntity<Void> patchEvent(
             @PathVariable(name = "id") final String id,
             @RequestBody final EventPatchDto patchDto,
-            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
+            final HttpServletRequest request) {
+
+        logRequest("Patch /events/" + patchDto, null, sid, request);
 
         if (sid == null || sessionService.getUserIdFromSession(sid).isEmpty()) {
             throw new UnauthorizedException("not authenticated");
@@ -109,7 +124,10 @@ public class EventController {
     @GetMapping("/{id}")
     public ResponseEntity<EventDto> getEvent(
             @PathVariable(name = "id") final String id,
-            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
+            final HttpServletRequest request) {
+
+        logRequest("GET /events/" + id, null, sid, request);
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
         final Event event = eventService.findById(id);
@@ -117,5 +135,19 @@ public class EventController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(EventDto.fromEntity(event));
+    }
+
+
+    private void logRequest(final String endpoint, final Object body, final String sid, final HttpServletRequest request) {
+        final String sidShort = (sid != null && !sid.isBlank())
+                ? sid.substring(0, Math.min(12, sid.length())) + "..."
+                : "null";
+
+        try {
+            final String bodyStr = (body != null) ? objectMapper.writeValueAsString(body) : "{}";
+            log.info("[REQUEST] {} | sid={} | body={}", endpoint, sidShort, bodyStr);
+        } catch (final Exception e) {
+            log.info("[REQUEST] {} | sid={}", endpoint, sidShort);
+        }
     }
 }

@@ -135,7 +135,9 @@ public class EventServiceImpl implements EventService {
             criteriaPrice = criteriaPrice.lte(priceTo);
         }
 
-        query.addCriteria(criteriaPrice);
+        if (priceTo != null || priceFrom != null) {
+            query.addCriteria(criteriaPrice);
+        }
 
         if (StringUtils.hasText(city)) {
             query.addCriteria(Criteria.where("location.city").is(city));
@@ -153,7 +155,9 @@ public class EventServiceImpl implements EventService {
             criteriaDate = criteriaDate.lte(to);
         }
 
-        query.addCriteria(criteriaDate);
+        if (StringUtils.hasText(dateFrom) || StringUtils.hasText(dateTo)) {
+            query.addCriteria(criteriaDate);
+        }
 
         final Optional<User> foundedUser = userService.findByUsername(user);
         if (StringUtils.hasText(user) && foundedUser.isPresent()) {

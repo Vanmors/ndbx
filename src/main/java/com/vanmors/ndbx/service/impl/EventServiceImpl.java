@@ -245,4 +245,9 @@ public class EventServiceImpl implements EventService {
 
         return new PageImpl<>(dtos, pageable, total);
     }
+
+    @Override
+    public List<Event> findAll() {
+        return eventRepository.findAll();
+    }
 }

@@ -6,6 +6,8 @@ import com.vanmors.ndbx.entity.Category;
 import com.vanmors.ndbx.entity.Event;
 import org.springframework.data.domain.Page;
 
+import java.util.List;
+
 
 public interface EventService {
 
@@ -21,5 +23,7 @@ public interface EventService {
 
     Event findById(String id);
 
-    Page<EventDto> findByUser(final String createdBy, final int limit, final int offset);
+    Page<EventDto> findByUser(String createdBy, int limit, int offset);
+
+    List<Event> findAll();
 }

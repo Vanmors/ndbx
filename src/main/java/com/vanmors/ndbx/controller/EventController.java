@@ -22,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
 import java.util.Map;
 
 
@@ -95,6 +96,13 @@ public class EventController {
             @Min(0) @RequestParam(name = "offset", defaultValue = "0") final int offset,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
             final HttpServletRequest request) {
+
+        final List<Event> events = eventService.findAll();
+
+        log.info("count all={}", events.size());
+        for (final var event: events) {
+            log.info("event={}", event.toString());
+        }
 
         logRequest("GET /events/", null, sid, request);
         log.info("id={} ", id);

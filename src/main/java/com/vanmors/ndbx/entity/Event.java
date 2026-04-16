@@ -131,6 +131,23 @@ public class Event {
         this.participant_ids = participant_ids;
     }
 
+    @Override
+    public String toString() {
+        return "Event{" +
+                "id='" + id + '\'' +
+                ", title='" + title + '\'' +
+                ", category=" + category +
+                ", price=" + price +
+                ", description='" + description + '\'' +
+                ", location=" + location +
+                ", created_at=" + created_at +
+                ", created_by='" + created_by + '\'' +
+                ", started_at=" + started_at +
+                ", finished_at=" + finished_at +
+                ", participant_ids=" + participant_ids +
+                '}';
+    }
+
     public static class Location {
         private String address;
 
@@ -153,6 +170,14 @@ public class Event {
 
         public String getCity() {
             return city;
+        }
+
+        @Override
+        public String toString() {
+            return "Location{" +
+                    "city='" + city + '\'' +
+                    ", address='" + address + '\'' +
+                    '}';
         }
     }
 }

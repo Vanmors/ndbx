@@ -180,8 +180,8 @@ public class EventServiceImpl implements EventService {
         query.with(pageable);
 
         log.info("findFiltered query: {}", query);
-        log.info("findFiltered - user='{}', price_to={}, date_from={}, date_to={}",
-                user, priceTo, dateFrom, dateTo);
+        log.info("findFiltered - id='{}', user='{}', price_to={}, date_from={}, date_to={}",
+                id, user, priceTo, dateFrom, dateTo);
 
         final List<Event> events = mongoTemplate.find(query, Event.class);
         final long total = mongoTemplate.count(query, Event.class);

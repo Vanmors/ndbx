@@ -57,6 +57,15 @@ public class EventController {
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
         logRequest("Post /events/", dto, sid, request);
+        log.info("id={} ", dto.id());
+        log.info("title={} ", dto.title());
+        log.info("category={} ", dto.category());
+        log.info("price={} ", dto.price());
+        log.info("description={} ", dto.description());
+        log.info("location={} ", dto.location());
+        log.info("created_at={} ", dto.created_at());
+        log.info("created_by={} ", dto.created_by());
+        log.info("started_at={} ", dto.started_at());
 
         try {
             final Event event = eventService.createEvent(dto, sid);
@@ -88,6 +97,15 @@ public class EventController {
             final HttpServletRequest request) {
 
         logRequest("GET /events/", null, sid, request);
+        log.info("id={} ", id);
+        log.info("title={} ", title);
+        log.info("category={} ", category);
+        log.info("price_from={} ", price_from);
+        log.info("price_to={} ", price_to);
+        log.info("city={} ", city);
+        log.info("date_from={} ", date_from);
+        log.info("date_to={} ", date_to);
+        log.info("user={} ", user);
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
 

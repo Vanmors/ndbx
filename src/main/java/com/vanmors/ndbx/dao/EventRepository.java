@@ -10,4 +10,5 @@ import org.springframework.stereotype.Repository;
 public interface EventRepository extends MongoRepository<Event, String> {
     Page<Event> findByTitleContainingIgnoreCase(String title, Pageable pageable);
     long countByTitleContainingIgnoreCase(String title);
+    long countByTitleIgnoreCase(String title);
 }

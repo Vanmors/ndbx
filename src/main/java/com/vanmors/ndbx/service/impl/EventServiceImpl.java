@@ -62,7 +62,7 @@ public class EventServiceImpl implements EventService {
                 () -> new UnauthorizedException("not authenticated")
         );
 
-        if (eventRepository.countByTitleContainingIgnoreCase(eventDto.title()) > 0) {
+        if (eventRepository.countByTitleIgnoreCase(eventDto.title()) > 0) {
             throw new DataIntegrityViolationException("event already exists");
         }
 

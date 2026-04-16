@@ -103,6 +103,7 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public Page<EventDto> findFiltered(
+            final String id,
             final String title,
             final Category category,
             final Long priceFrom,
@@ -117,6 +118,10 @@ public class EventServiceImpl implements EventService {
         final Pageable pageable = PageRequest.of(offset / limit, limit);
 
         final Query query = new Query();
+
+        if (StringUtils.hasText(id)) {
+            query.addCriteria(Criteria.where("id").is(id));
+        }
 
         if (StringUtils.hasText(title)) {
             query.addCriteria(Criteria.where("title").regex(title, "i"));
@@ -210,10 +215,10 @@ public class EventServiceImpl implements EventService {
             event.setPrice(patchDto.price());
         }
 
-        if (patchDto.city() == null || patchDto.city().isBlank()) {
-            event.getLocation().setCity(null);
-        } else {
+        if (StringUtils.hasText(patchDto.city())) {
             event.getLocation().setCity(patchDto.city());
+        } else {
+            event.getLocation().setCity(null);
         }
 
         eventRepository.save(event);

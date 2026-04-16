@@ -13,7 +13,7 @@ public interface EventService {
 
     Page<EventDto> findAll(String title, int limit, int offset);
 
-    Page<EventDto> findFiltered(String title, Category category, Long priceFrom,
+    Page<EventDto> findFiltered(String id, String title, Category category, Long priceFrom,
                                 Long priceTo, String city, String dateFrom, String dateTo,
                                 String user, int limit, int offset);
 

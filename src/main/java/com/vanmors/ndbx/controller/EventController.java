@@ -73,6 +73,7 @@ public class EventController {
 
     @GetMapping
     public ResponseEntity<EventsResponse> findFiltered(
+            @RequestParam(name = "id", required = false) final String id,
             @RequestParam(name = "title", required = false) final String title,
             @RequestParam(name = "category", required = false) final Category category,
             @RequestParam(name = "price_from", required = false) final Long price_from,
@@ -91,7 +92,7 @@ public class EventController {
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
         final Page<EventDto> page = eventService.findFiltered(
-                title, category, price_from, price_to, city,
+                id, title, category, price_from, price_to, city,
                 date_from, date_to, user, limit, offset);
 
         return ResponseEntity.ok()

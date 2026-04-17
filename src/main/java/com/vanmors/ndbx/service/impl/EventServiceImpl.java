@@ -133,17 +133,26 @@ public class EventServiceImpl implements EventService {
             query.addCriteria(Criteria.where("category").is(category.name()));
         }
 
-        Criteria criteriaPrice = Criteria.where("price");
+        if (priceFrom != null || priceTo != null) {
 
-        if (priceFrom != null) {
-            criteriaPrice = criteriaPrice.gte(priceFrom);
-        }
-        if (priceTo != null) {
-            criteriaPrice = criteriaPrice.lte(priceTo);
-        }
+            if (priceTo != null && priceTo == 0) {
+                query.addCriteria(new Criteria().orOperator(
+                        Criteria.where("price").lte(0),
+                        Criteria.where("price").isNull()
+                ));
+            }
+            else {
+                Criteria priceCriteria = Criteria.where("price");
 
-        if (priceTo != null || priceFrom != null) {
-            query.addCriteria(criteriaPrice);
+                if (priceFrom != null) {
+                    priceCriteria = priceCriteria.gte(priceFrom);
+                }
+                if (priceTo != null) {
+                    priceCriteria = priceCriteria.lte(priceTo);
+                }
+
+                query.addCriteria(priceCriteria);
+            }
         }
 
         if (StringUtils.hasText(city)) {

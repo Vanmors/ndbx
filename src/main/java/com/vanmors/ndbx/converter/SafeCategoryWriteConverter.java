@@ -14,10 +14,11 @@ public class SafeCategoryWriteConverter implements Converter<Category, String> {
 
     @Override
     public String convert(final Category source) {
-        log.info("try write={}", source);
+
         if (source == null) {
             return null;
         }
+        log.info("try write={}", source);
         return source.name().toLowerCase();
     }
 }

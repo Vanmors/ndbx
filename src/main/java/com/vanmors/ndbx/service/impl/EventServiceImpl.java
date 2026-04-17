@@ -173,8 +173,10 @@ public class EventServiceImpl implements EventService {
         final Optional<User> foundedUser = userService.findByUsername(user);
         if (StringUtils.hasText(user)) {
             if (foundedUser.isPresent()) {
+                log.info("User founded={}", foundedUser.get().getId());
                 query.addCriteria(Criteria.where("created_by").is(foundedUser.get().getId()));
             } else {
+                log.info("user not found");
                 query.addCriteria(Criteria.where("created_by").is(null));
             }
         }

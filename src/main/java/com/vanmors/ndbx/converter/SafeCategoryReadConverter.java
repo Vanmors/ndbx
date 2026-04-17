@@ -13,7 +13,7 @@ public class SafeCategoryReadConverter implements Converter<String, Category> {
 
     @Override
     public Category convert(final String source) {
-        log.info("try read={}", source);
+//        log.info("try read={}", source);
         if (source == null || source.isBlank()) {
             return null; // или Category.other
         }

@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -40,12 +41,15 @@ public class EventController {
 
     private final CookieBuilder cookieBuilder;
 
+    private final MongoTemplate mongoTemplate;
+
     @Autowired
-    public EventController(final EventService eventService, final SessionService sessionService, final CookieBuilder cookieBuilder, final ObjectMapper objectMapper) {
+    public EventController(final EventService eventService, final SessionService sessionService, final CookieBuilder cookieBuilder, final ObjectMapper objectMapper, final MongoTemplate mongoTemplate) {
         this.eventService = eventService;
         this.sessionService = sessionService;
         this.cookieBuilder = cookieBuilder;
         this.objectMapper = objectMapper;
+        this.mongoTemplate = mongoTemplate;
 
     }
 
@@ -99,10 +103,14 @@ public class EventController {
 
         final List<Event> events = eventService.findAll();
 
-        log.info("count all={}", events.size());
-        for (final var event: events) {
-            log.info("event={}", event.toString());
-        }
+//        log.info("count all={}", events.size());
+//        for (final var event: events) {
+//            log.info("event={}", event.toString());
+//        }
+
+        mongoTemplate.getCollection("events")
+                .find()
+                .forEach(doc -> log.info("RAW BSON={}", doc.toJson()));
 
         logRequest("GET /events/", null, sid, request);
         log.info("id={} ", id);

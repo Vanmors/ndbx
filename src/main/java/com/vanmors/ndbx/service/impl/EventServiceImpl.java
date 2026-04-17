@@ -58,6 +58,8 @@ public class EventServiceImpl implements EventService {
     @Override
     public Event createEvent(final EventDto eventDto, final String sid) {
 
+        log.info("category here={}", eventDto.category());
+
         final String userId = sessionService.getUserIdFromSession(sid).orElseThrow(
                 () -> new UnauthorizedException("not authenticated")
         );

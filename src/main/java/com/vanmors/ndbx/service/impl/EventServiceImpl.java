@@ -130,7 +130,7 @@ public class EventServiceImpl implements EventService {
         }
 
         if (category != null) {
-            query.addCriteria(Criteria.where("category").is(category));
+            query.addCriteria(Criteria.where("category").is(category.name()));
         }
 
         Criteria criteriaPrice = Criteria.where("price");

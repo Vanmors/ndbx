@@ -171,7 +171,7 @@ public class EventServiceImpl implements EventService {
         if (StringUtils.hasText(dateTo)) {
             final Instant to = DateUtils.parseDateToEndOfDayFromYYYYMMDD(dateTo);
             if (to != null) {
-                criteriaDate = criteriaDate.lte(to);
+                criteriaDate = criteriaDate.lt(to);
             }
         }
 
@@ -179,14 +179,14 @@ public class EventServiceImpl implements EventService {
             query.addCriteria(criteriaDate);
         }
 
-        final Optional<User> foundedUser = userService.findByUsername(user);
         if (StringUtils.hasText(user)) {
+            final Optional<User> foundedUser = userService.findByUsername(user);
             if (foundedUser.isPresent()) {
                 log.info("User founded={}", foundedUser.get().getId());
                 query.addCriteria(Criteria.where("created_by").is(foundedUser.get().getId()));
             } else {
                 log.info("user not found");
-                query.addCriteria(Criteria.where("created_by").is(null));
+                return new PageImpl<>(List.of(), pageable, 0);
             }
         }
 

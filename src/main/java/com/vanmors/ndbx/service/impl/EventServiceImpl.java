@@ -121,16 +121,23 @@ public class EventServiceImpl implements EventService {
         final Pageable pageable = PageRequest.of(offset / limit, limit);
         final Query query = new Query();
 
-        // Title — используем Pattern.quote как в reference-коде
+        // === 1. ID ===
+        if (StringUtils.hasText(id)) {
+            query.addCriteria(Criteria.where("_id").is(id));
+        }
+
+        // === 2. Title ===
         if (StringUtils.hasText(title)) {
             query.addCriteria(Criteria.where("title")
                     .regex(Pattern.quote(title), "i"));
         }
 
+        // === 3. Category ===
         if (category != null) {
             query.addCriteria(Criteria.where("category").is(category.name()));
         }
 
+        // === 4. Price (особенно price_to=0) ===
         if (priceFrom != null || priceTo != null) {
             if (priceTo != null && priceTo == 0) {
                 query.addCriteria(new Criteria().orOperator(
@@ -145,53 +152,65 @@ public class EventServiceImpl implements EventService {
             }
         }
 
+        // === 5. City ===
         if (StringUtils.hasText(city)) {
             query.addCriteria(Criteria.where("location.city").is(city));
         }
 
-        if (StringUtils.hasText(dateFrom) || StringUtils.hasText(dateTo)) {
-            Criteria dateCriteria = Criteria.where("started_at");
-
-            if (StringUtils.hasText(dateFrom)) {
-                final Instant from = DateUtils.parseDateFromYYYYMMDD(dateFrom);
-                if (from != null) dateCriteria = dateCriteria.gte(from);
-            }
-
-            if (StringUtils.hasText(dateTo)) {
-                final Instant to = DateUtils.parseDateToEndOfDayFromYYYYMMDD(dateTo);
-                if (to != null) dateCriteria = dateCriteria.lte(to);
-            }
-
-            query.addCriteria(dateCriteria);
-        }
-
+        // === 6. User ===
         if (StringUtils.hasText(user)) {
-            final Optional<User> foundedUser = userService.findByUsername(user);
+            Optional<User> foundedUser = userService.findByUsername(user);
             if (foundedUser.isPresent()) {
-                log.info("User founded={}", foundedUser.get().getId());
                 query.addCriteria(Criteria.where("created_by").is(foundedUser.get().getId()));
             } else {
-                log.info("user not found");
                 return new PageImpl<>(List.of(), pageable, 0);
             }
         }
 
+        // === 7. Пагинация ===
         query.with(pageable);
 
         log.info("findFiltered query: {}", query);
-        log.info("findFiltered - id='{}', user='{}', price_to={}, date_from={}, date_to={}",
-                id, user, priceTo, dateFrom, dateTo);
 
+        // Достаём без фильтра по датам
         final List<Event> events = mongoTemplate.find(query, Event.class);
-        final long total = mongoTemplate.count(query, Event.class);
+        for (Event event: events) {
+            log.info("event={}", event);
+        }
 
-        log.info("findFiltered result: found {} events (total count = {})", events.size(), total);
+        // ФИЛЬТР ПО ДАТАМ В JAVA
+        final List<Event> filteredByDate = events.stream()
+                .filter(event -> matchesDateFilter(event, dateFrom, dateTo))
+                .toList();
 
-        final List<EventDto> dtos = events.stream()
+        final long total = filteredByDate.size();
+
+        log.info("findFiltered result: found {} events after date filter (total before date filter = {})",
+                filteredByDate.size(), events.size());
+
+        final List<EventDto> dtos = filteredByDate.stream()
                 .map(EventDto::fromEntity)
                 .toList();
 
         return new PageImpl<>(dtos, pageable, total);
+    }
+
+    private boolean matchesDateFilter(Event event, String dateFrom, String dateTo) {
+        if (event.getStartedAt() == null) return false;
+
+        Instant started = event.getStartedAt();
+
+        if (StringUtils.hasText(dateFrom)) {
+            Instant from = DateUtils.parseDateFromYYYYMMDD(dateFrom);
+            if (from != null && started.isBefore(from)) return false;
+        }
+
+        if (StringUtils.hasText(dateTo)) {
+            Instant to = DateUtils.parseDateToEndOfDayFromYYYYMMDD(dateTo);
+            if (to != null && started.isAfter(to)) return false;
+        }
+
+        return true;
     }
 
     @Override

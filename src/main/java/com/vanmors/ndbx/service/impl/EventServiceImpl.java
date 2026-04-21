@@ -121,23 +121,19 @@ public class EventServiceImpl implements EventService {
         final Pageable pageable = PageRequest.of(offset / limit, limit);
         final Query query = new Query();
 
-        // === 1. ID ===
         if (StringUtils.hasText(id)) {
             query.addCriteria(Criteria.where("_id").is(id));
         }
 
-        // === 2. Title ===
         if (StringUtils.hasText(title)) {
             query.addCriteria(Criteria.where("title")
                     .regex(Pattern.quote(title), "i"));
         }
 
-        // === 3. Category ===
         if (category != null) {
             query.addCriteria(Criteria.where("category").is(category.name()));
         }
 
-        // === 4. Price (особенно price_to=0) ===
         if (priceFrom != null || priceTo != null) {
             if (priceTo != null && priceTo == 0) {
                 query.addCriteria(new Criteria().orOperator(
@@ -146,20 +142,22 @@ public class EventServiceImpl implements EventService {
                 ));
             } else {
                 Criteria priceCriteria = Criteria.where("price");
-                if (priceFrom != null) priceCriteria = priceCriteria.gte(priceFrom);
-                if (priceTo != null) priceCriteria = priceCriteria.lte(priceTo);
+                if (priceFrom != null) {
+                    priceCriteria = priceCriteria.gte(priceFrom);
+                }
+                if (priceTo != null) {
+                    priceCriteria = priceCriteria.lte(priceTo);
+                }
                 query.addCriteria(priceCriteria);
             }
         }
 
-        // === 5. City ===
         if (StringUtils.hasText(city)) {
             query.addCriteria(Criteria.where("location.city").is(city));
         }
 
-        // === 6. User ===
         if (StringUtils.hasText(user)) {
-            Optional<User> foundedUser = userService.findByUsername(user);
+            final Optional<User> foundedUser = userService.findByUsername(user);
             if (foundedUser.isPresent()) {
                 query.addCriteria(Criteria.where("created_by").is(foundedUser.get().getId()));
             } else {
@@ -167,18 +165,12 @@ public class EventServiceImpl implements EventService {
             }
         }
 
-        // === 7. Пагинация ===
         query.with(pageable);
 
         log.info("findFiltered query: {}", query);
 
-        // Достаём без фильтра по датам
         final List<Event> events = mongoTemplate.find(query, Event.class);
-        for (Event event: events) {
-            log.info("event={}", event);
-        }
 
-        // ФИЛЬТР ПО ДАТАМ В JAVA
         final List<Event> filteredByDate = events.stream()
                 .filter(event -> matchesDateFilter(event, dateFrom, dateTo))
                 .toList();
@@ -195,19 +187,23 @@ public class EventServiceImpl implements EventService {
         return new PageImpl<>(dtos, pageable, total);
     }
 
-    private boolean matchesDateFilter(Event event, String dateFrom, String dateTo) {
-        if (event.getStartedAt() == null) return false;
+    private boolean matchesDateFilter(final Event event, final String dateFrom, final String dateTo) {
+        if (event.getStartedAt() == null) {
+            return false;
+        }
 
-        Instant started = event.getStartedAt();
+        final Instant started = event.getStartedAt();
 
         if (StringUtils.hasText(dateFrom)) {
-            Instant from = DateUtils.parseDateFromYYYYMMDD(dateFrom);
-            if (from != null && started.isBefore(from)) return false;
+            final Instant from = DateUtils.parseDateFromYYYYMMDD(dateFrom);
+            if (from != null && started.isBefore(from)) {
+                return false;
+            }
         }
 
         if (StringUtils.hasText(dateTo)) {
-            Instant to = DateUtils.parseDateToEndOfDayFromYYYYMMDD(dateTo);
-            if (to != null && started.isAfter(to)) return false;
+            final Instant to = DateUtils.parseDateToEndOfDayFromYYYYMMDD(dateTo);
+            return to == null || !started.isAfter(to);
         }
 
         return true;

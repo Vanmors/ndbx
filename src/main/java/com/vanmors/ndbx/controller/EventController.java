@@ -101,27 +101,11 @@ public class EventController {
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
             final HttpServletRequest request) {
 
-        final List<Event> events = eventService.findAll();
-
-//        log.info("count all={}", events.size());
-//        for (final var event: events) {
-//            log.info("event={}", event.toString());
-//        }
-
-        mongoTemplate.getCollection("events")
-                .find()
-                .forEach(doc -> log.info("RAW BSON={}", doc.toJson()));
+//        mongoTemplate.getCollection("events")
+//                .find()
+//                .forEach(doc -> log.info("RAW BSON={}", doc.toJson()));
 
         logRequest("GET /events/", null, sid, request);
-        log.info("id={} ", id);
-        log.info("title={} ", title);
-        log.info("category={} ", category);
-        log.info("price_from={} ", price_from);
-        log.info("price_to={} ", price_to);
-        log.info("city={} ", city);
-        log.info("date_from={} ", date_from);
-        log.info("date_to={} ", date_to);
-        log.info("user={} ", user);
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
 

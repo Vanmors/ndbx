@@ -24,6 +24,7 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 
 @Service
@@ -88,7 +89,7 @@ public class UserServiceImpl implements UserService {
         final Query query = new Query();
 
         if (StringUtils.hasText(name)) {
-            query.addCriteria(Criteria.where("full_name").regex(name, "i"));
+            query.addCriteria(Criteria.where("full_name").regex(Pattern.quote(name), "i"));
         }
 
         // Точный поиск по id

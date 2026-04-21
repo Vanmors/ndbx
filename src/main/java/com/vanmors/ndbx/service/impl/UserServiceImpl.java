@@ -101,13 +101,12 @@ public class UserServiceImpl implements UserService {
         query.with(pageable);
 
         final List<User> users = mongoTemplate.find(query, User.class);
-        final long total = mongoTemplate.count(query, User.class);
 
         final List<UserDto> dtos = users.stream()
                 .map(UserDto::fromEntity)
                 .toList();
 
-        return new PageImpl<>(dtos, pageable, total);
+        return new PageImpl<>(dtos, pageable, users.size());
     }
 
 }

@@ -5,6 +5,7 @@ import com.vanmors.ndbx.controller.response.UsersResponse;
 import com.vanmors.ndbx.dto.EventDto;
 import com.vanmors.ndbx.dto.UserDto;
 import com.vanmors.ndbx.dto.UserRegistrationDto;
+import com.vanmors.ndbx.entity.Category;
 import com.vanmors.ndbx.entity.User;
 import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.UserService;
@@ -77,14 +78,27 @@ public class UserController {
 
     @GetMapping("/{id}/events")
     public ResponseEntity<EventsResponse> getUserEvents(
-            @PathVariable(name = "id") final String id,
+            @PathVariable("id") final String id,
+            @RequestParam(name = "title", required = false) final String title,
+            @RequestParam(name = "category", required = false) final Category category,
+            @RequestParam(name = "price_from", required = false) final Long priceFrom,
+            @RequestParam(name = "price_to", required = false) final Long priceTo,
+            @RequestParam(name = "city", required = false) final String city,
+            @RequestParam(name = "date_from", required = false) final String dateFrom,
+            @RequestParam(name = "date_to", required = false) final String dateTo,
             @Min(0) @RequestParam(name = "limit", defaultValue = "10") final int limit,
             @Min(0) @RequestParam(name = "offset", defaultValue = "0") final int offset,
-            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
-
+            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid
+    ) {
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
-        final Page<EventDto> page = eventService.findByUser(id, limit, offset);
+        final User user = userService.findById(id);
+
+        final Page<EventDto> page = eventService.findFiltered(
+                null, title, category, priceFrom, priceTo, city,
+                dateFrom, dateTo, user.getUsername(),
+                limit, offset
+        );
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())

@@ -101,10 +101,6 @@ public class UserServiceImpl implements UserService {
 
         final List<User> users = mongoTemplate.find(query, User.class);
 
-        for (final User user: users) {
-            log.info("found={}", user);
-        }
-
         final List<UserDto> dtos = users.stream()
                 .map(UserDto::fromEntity)
                 .toList();

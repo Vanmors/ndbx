@@ -67,7 +67,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserDto> findUser(final String id, @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+    public ResponseEntity<UserDto> findUser(@PathVariable("id") final String id, @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
         final User user = userService.findById(id);

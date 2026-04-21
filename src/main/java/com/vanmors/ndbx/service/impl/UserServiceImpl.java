@@ -86,21 +86,17 @@ public class UserServiceImpl implements UserService {
 
         log.info("params: id={} name={}", id, name);
 
-//        final Pageable pageable = PageRequest.of(offset / limit, limit);
-
         final Query query = new Query();
 
         if (StringUtils.hasText(name)) {
             query.addCriteria(Criteria.where("full_name").regex(Pattern.quote(name), "i"));
         }
 
-        // Точный поиск по id
         if (StringUtils.hasText(id)) {
             query.addCriteria(Criteria.where("_id").is(id));
         }
 
         // Пагинация
-//        query.with(pageable);
         query.skip(offset).limit(limit);
 
         final List<User> users = mongoTemplate.find(query, User.class);

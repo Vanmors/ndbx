@@ -245,19 +245,20 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public Page<EventDto> findByUser(final String createdBy, final int limit, final int offset) {
-        final Pageable pageable = PageRequest.of(offset / limit, limit);
+
+        userService.findById(createdBy);
 
         final Query query = new Query(Criteria.where("created_by").is(createdBy));
-        query.with(pageable);
+
+        query.skip(offset).limit(limit);
 
         final List<Event> events = mongoTemplate.find(query, Event.class);
-        final long total = mongoTemplate.count(query, Event.class);
 
         final List<EventDto> dtos = events.stream()
                 .map(EventDto::fromEntity)
                 .toList();
 
-        return new PageImpl<>(dtos, pageable, total);
+        return new PageImpl<>(dtos, PageRequest.of(0, limit), events.size());
     }
 
     @Override

@@ -84,7 +84,9 @@ public class UserServiceImpl implements UserService {
     @Override
     public Page<UserDto> findUsers(final String name, final String id, final int limit, final int offset) {
 
-        final Pageable pageable = PageRequest.of(offset / limit, limit);
+        log.info("params: id={} name={}", id, name);
+
+//        final Pageable pageable = PageRequest.of(offset / limit, limit);
 
         final Query query = new Query();
 
@@ -98,15 +100,20 @@ public class UserServiceImpl implements UserService {
         }
 
         // Пагинация
-        query.with(pageable);
+//        query.with(pageable);
+        query.skip(offset).limit(limit);
 
         final List<User> users = mongoTemplate.find(query, User.class);
+
+        for (final User user: users) {
+            log.info("found={}", user);
+        }
 
         final List<UserDto> dtos = users.stream()
                 .map(UserDto::fromEntity)
                 .toList();
 
-        return new PageImpl<>(dtos, pageable, users.size());
+        return new PageImpl<>(dtos, PageRequest.of(0, limit), users.size());
     }
 
 }

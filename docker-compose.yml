@@ -36,56 +36,56 @@ services:
 
   cfg1:
     image: mongo:8.0
-    command: ["mongod", "--configsvr", "--replSet", "cfgReplSet", "--bind_ip_all", "--port", "27100", "--logpath", "/dev/null"]
-#    volumes:
-#      - cfg1_data:/data/db
+    command: ["mongod", "--configsvr", "--replSet", "cfgReplSet", "--bind_ip_all", "--port", "${MONGO_CFG_PORT}", "--logpath", "/dev/null"]
+    volumes:
+      - cfg1_data:/data/db
 
   shard1a:
     image: mongo:8.0
-    command: ["mongod", "--shardsvr", "--replSet", "shard1", "--bind_ip_all", "--port", "27101", "--logpath", "/dev/null"]
-#    volumes:
-#      - shard1a_data:/data/db
+    command: ["mongod", "--shardsvr", "--replSet", "shard1", "--bind_ip_all", "--port", "${MONGO_SHARD1A_PORT}", "--logpath", "/dev/null"]
+    volumes:
+      - shard1a_data:/data/db
 
   shard1b:
     image: mongo:8.0
-    command: ["mongod", "--shardsvr", "--replSet", "shard1", "--bind_ip_all", "--port", "27102", "--logpath", "/dev/null"]
-#    volumes:
-#      - shard1b_data:/data/db
+    command: ["mongod", "--shardsvr", "--replSet", "shard1", "--bind_ip_all", "--port", "${MONGO_SHARD1B_PORT}", "--logpath", "/dev/null"]
+    volumes:
+      - shard1b_data:/data/db
 
   shard1c:
     image: mongo:8.0
-    command: ["mongod", "--shardsvr", "--replSet", "shard1", "--bind_ip_all", "--port", "27103", "--logpath", "/dev/null"]
-#    volumes:
-#      - shard1c_data:/data/db
+    command: ["mongod", "--shardsvr", "--replSet", "shard1", "--bind_ip_all", "--port", "${MONGO_SHARD1C_PORT}", "--logpath", "/dev/null"]
+    volumes:
+      - shard1c_data:/data/db
 
   shard2a:
     image: mongo:8.0
-    command: ["mongod", "--shardsvr", "--replSet", "shard2", "--bind_ip_all", "--port", "27104", "--logpath", "/dev/null"]
-#    volumes:
-#      - shard2a_data:/data/db
+    command: ["mongod", "--shardsvr", "--replSet", "shard2", "--bind_ip_all", "--port", "${MONGO_SHARD2A_PORT}", "--logpath", "/dev/null"]
+    volumes:
+      - shard2a_data:/data/db
 
   shard2b:
     image: mongo:8.0
-    command: ["mongod", "--shardsvr", "--replSet", "shard2", "--bind_ip_all", "--port", "27105", "--logpath", "/dev/null"]
-#    volumes:
-#      - shard2b_data:/data/db
+    command: ["mongod", "--shardsvr", "--replSet", "shard2", "--bind_ip_all", "--port", "${MONGO_SHARD2B_PORT}", "--logpath", "/dev/null"]
+    volumes:
+      - shard2b_data:/data/db
 
   shard2c:
     image: mongo:8.0
-    command: ["mongod", "--shardsvr", "--replSet", "shard2", "--bind_ip_all", "--port", "27106", "--logpath", "/dev/null"]
-#    volumes:
-#      - shard2c_data:/data/db
+    command: ["mongod", "--shardsvr", "--replSet", "shard2", "--bind_ip_all", "--port", "${MONGO_SHARD2C_PORT}", "--logpath", "/dev/null"]
+    volumes:
+      - shard2c_data:/data/db
 
   mongos:
     image: mongo:8.0
-    command: ["mongos", "--configdb", "cfgReplSet/cfg1:27100", "--bind_ip_all", "--port", "${MONGODB_PORT}"]
+    command: [ "mongos", "--configdb", "cfgReplSet/cfg1:${MONGO_CFG_PORT}", "--bind_ip_all", "--port", "${MONGODB_PORT}" ]
     depends_on:
       cfg1:
         condition: service_started
     ports:
       - "${MONGODB_PORT}:${MONGODB_PORT}"
     healthcheck:
-      test: ["CMD", "mongosh", "--host", "localhost", "--port", "${MONGODB_PORT}", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      test: [ "CMD", "mongosh", "--host", "localhost", "--port", "${MONGODB_PORT}", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok" ]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -117,11 +117,11 @@ services:
     entrypoint: ["/bin/bash", "/scripts/mongo-cluster-init.sh"]
     restart: "no"
 
-#volumes:
-#  cfg1_data:
-#  shard1a_data:
-#  shard1b_data:
-#  shard1c_data:
-#  shard2a_data:
-#  shard2b_data:
-#  shard2c_data:
+volumes:
+  cfg1_data:
+  shard1a_data:
+  shard1b_data:
+  shard1c_data:
+  shard2a_data:
+  shard2b_data:
+  shard2c_data:

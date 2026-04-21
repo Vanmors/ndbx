@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 
 @Service
@@ -118,15 +119,12 @@ public class EventServiceImpl implements EventService {
             final int offset) {
 
         final Pageable pageable = PageRequest.of(offset / limit, limit);
-
         final Query query = new Query();
 
-        if (StringUtils.hasText(id)) {
-            query.addCriteria(Criteria.where("id").is(id));
-        }
-
+        // Title — используем Pattern.quote как в reference-коде
         if (StringUtils.hasText(title)) {
-            query.addCriteria(Criteria.where("title").regex(title, "i"));
+            query.addCriteria(Criteria.where("title")
+                    .regex(Pattern.quote(title), "i"));
         }
 
         if (category != null) {
@@ -134,23 +132,15 @@ public class EventServiceImpl implements EventService {
         }
 
         if (priceFrom != null || priceTo != null) {
-
             if (priceTo != null && priceTo == 0) {
                 query.addCriteria(new Criteria().orOperator(
                         Criteria.where("price").lte(0),
                         Criteria.where("price").isNull()
                 ));
-            }
-            else {
+            } else {
                 Criteria priceCriteria = Criteria.where("price");
-
-                if (priceFrom != null) {
-                    priceCriteria = priceCriteria.gte(priceFrom);
-                }
-                if (priceTo != null) {
-                    priceCriteria = priceCriteria.lte(priceTo);
-                }
-
+                if (priceFrom != null) priceCriteria = priceCriteria.gte(priceFrom);
+                if (priceTo != null) priceCriteria = priceCriteria.lte(priceTo);
                 query.addCriteria(priceCriteria);
             }
         }
@@ -159,24 +149,20 @@ public class EventServiceImpl implements EventService {
             query.addCriteria(Criteria.where("location.city").is(city));
         }
 
-        Criteria criteriaDate = Criteria.where("started_at");
-
-        if (StringUtils.hasText(dateFrom)) {
-            final Instant from = DateUtils.parseDateFromYYYYMMDD(dateFrom);
-            if (from != null) {
-                criteriaDate = criteriaDate.gte(from);
-            }
-        }
-
-        if (StringUtils.hasText(dateTo)) {
-            final Instant to = DateUtils.parseDateToEndOfDayFromYYYYMMDD(dateTo);
-            if (to != null) {
-                criteriaDate = criteriaDate.lt(to);
-            }
-        }
-
         if (StringUtils.hasText(dateFrom) || StringUtils.hasText(dateTo)) {
-            query.addCriteria(criteriaDate);
+            Criteria dateCriteria = Criteria.where("started_at");
+
+            if (StringUtils.hasText(dateFrom)) {
+                final Instant from = DateUtils.parseDateFromYYYYMMDD(dateFrom);
+                if (from != null) dateCriteria = dateCriteria.gte(from);
+            }
+
+            if (StringUtils.hasText(dateTo)) {
+                final Instant to = DateUtils.parseDateToEndOfDayFromYYYYMMDD(dateTo);
+                if (to != null) dateCriteria = dateCriteria.lte(to);
+            }
+
+            query.addCriteria(dateCriteria);
         }
 
         if (StringUtils.hasText(user)) {

@@ -24,6 +24,7 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 
 @Service
@@ -83,30 +84,28 @@ public class UserServiceImpl implements UserService {
     @Override
     public Page<UserDto> findUsers(final String name, final String id, final int limit, final int offset) {
 
-        final Pageable pageable = PageRequest.of(offset / limit, limit);
+        log.info("params: id={} name={}", id, name);
 
         final Query query = new Query();
 
         if (StringUtils.hasText(name)) {
-            query.addCriteria(Criteria.where("full_name").regex(name, "i"));
+            query.addCriteria(Criteria.where("full_name").regex(Pattern.quote(name), "i"));
         }
 
-        // Точный поиск по id
         if (StringUtils.hasText(id)) {
             query.addCriteria(Criteria.where("_id").is(id));
         }
 
         // Пагинация
-        query.with(pageable);
+        query.skip(offset).limit(limit);
 
         final List<User> users = mongoTemplate.find(query, User.class);
-        final long total = mongoTemplate.count(query, User.class);
 
         final List<UserDto> dtos = users.stream()
                 .map(UserDto::fromEntity)
                 .toList();
 
-        return new PageImpl<>(dtos, pageable, total);
+        return new PageImpl<>(dtos, PageRequest.of(0, limit), users.size());
     }
 
 }

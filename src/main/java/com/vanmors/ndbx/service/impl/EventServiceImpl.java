@@ -121,7 +121,10 @@ public class EventServiceImpl implements EventService {
         final Pageable pageable = PageRequest.of(offset / limit, limit);
         final Query query = new Query();
 
-        // Title — используем Pattern.quote как в reference-коде
+        if (StringUtils.hasText(id)) {
+            query.addCriteria(Criteria.where("_id").is(id));
+        }
+
         if (StringUtils.hasText(title)) {
             query.addCriteria(Criteria.where("title")
                     .regex(Pattern.quote(title), "i"));
@@ -139,8 +142,12 @@ public class EventServiceImpl implements EventService {
                 ));
             } else {
                 Criteria priceCriteria = Criteria.where("price");
-                if (priceFrom != null) priceCriteria = priceCriteria.gte(priceFrom);
-                if (priceTo != null) priceCriteria = priceCriteria.lte(priceTo);
+                if (priceFrom != null) {
+                    priceCriteria = priceCriteria.gte(priceFrom);
+                }
+                if (priceTo != null) {
+                    priceCriteria = priceCriteria.lte(priceTo);
+                }
                 query.addCriteria(priceCriteria);
             }
         }
@@ -149,29 +156,11 @@ public class EventServiceImpl implements EventService {
             query.addCriteria(Criteria.where("location.city").is(city));
         }
 
-        if (StringUtils.hasText(dateFrom) || StringUtils.hasText(dateTo)) {
-            Criteria dateCriteria = Criteria.where("started_at");
-
-            if (StringUtils.hasText(dateFrom)) {
-                final Instant from = DateUtils.parseDateFromYYYYMMDD(dateFrom);
-                if (from != null) dateCriteria = dateCriteria.gte(from);
-            }
-
-            if (StringUtils.hasText(dateTo)) {
-                final Instant to = DateUtils.parseDateToEndOfDayFromYYYYMMDD(dateTo);
-                if (to != null) dateCriteria = dateCriteria.lte(to);
-            }
-
-            query.addCriteria(dateCriteria);
-        }
-
         if (StringUtils.hasText(user)) {
             final Optional<User> foundedUser = userService.findByUsername(user);
             if (foundedUser.isPresent()) {
-                log.info("User founded={}", foundedUser.get().getId());
                 query.addCriteria(Criteria.where("created_by").is(foundedUser.get().getId()));
             } else {
-                log.info("user not found");
                 return new PageImpl<>(List.of(), pageable, 0);
             }
         }
@@ -179,19 +168,45 @@ public class EventServiceImpl implements EventService {
         query.with(pageable);
 
         log.info("findFiltered query: {}", query);
-        log.info("findFiltered - id='{}', user='{}', price_to={}, date_from={}, date_to={}",
-                id, user, priceTo, dateFrom, dateTo);
 
         final List<Event> events = mongoTemplate.find(query, Event.class);
-        final long total = mongoTemplate.count(query, Event.class);
 
-        log.info("findFiltered result: found {} events (total count = {})", events.size(), total);
+        final List<Event> filteredByDate = events.stream()
+                .filter(event -> matchesDateFilter(event, dateFrom, dateTo))
+                .toList();
 
-        final List<EventDto> dtos = events.stream()
+        final long total = filteredByDate.size();
+
+        log.info("findFiltered result: found {} events after date filter (total before date filter = {})",
+                filteredByDate.size(), events.size());
+
+        final List<EventDto> dtos = filteredByDate.stream()
                 .map(EventDto::fromEntity)
                 .toList();
 
         return new PageImpl<>(dtos, pageable, total);
+    }
+
+    private boolean matchesDateFilter(final Event event, final String dateFrom, final String dateTo) {
+        if (event.getStartedAt() == null) {
+            return false;
+        }
+
+        final Instant started = event.getStartedAt();
+
+        if (StringUtils.hasText(dateFrom)) {
+            final Instant from = DateUtils.parseDateFromYYYYMMDD(dateFrom);
+            if (from != null && started.isBefore(from)) {
+                return false;
+            }
+        }
+
+        if (StringUtils.hasText(dateTo)) {
+            final Instant to = DateUtils.parseDateToEndOfDayFromYYYYMMDD(dateTo);
+            return to == null || !started.isAfter(to);
+        }
+
+        return true;
     }
 
     @Override
@@ -230,19 +245,20 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public Page<EventDto> findByUser(final String createdBy, final int limit, final int offset) {
-        final Pageable pageable = PageRequest.of(offset / limit, limit);
+
+        userService.findById(createdBy);
 
         final Query query = new Query(Criteria.where("created_by").is(createdBy));
-        query.with(pageable);
+
+        query.skip(offset).limit(limit);
 
         final List<Event> events = mongoTemplate.find(query, Event.class);
-        final long total = mongoTemplate.count(query, Event.class);
 
         final List<EventDto> dtos = events.stream()
                 .map(EventDto::fromEntity)
                 .toList();
 
-        return new PageImpl<>(dtos, pageable, total);
+        return new PageImpl<>(dtos, PageRequest.of(0, limit), events.size());
     }
 
     @Override

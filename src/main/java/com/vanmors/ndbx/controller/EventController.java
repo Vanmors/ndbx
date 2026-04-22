@@ -173,7 +173,7 @@ public class EventController {
 
         eventReactionService.like(eventId, userId.get());
 
-        return ResponseEntity.ok()
+        return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .build();
     }
@@ -191,7 +191,7 @@ public class EventController {
 
         eventReactionService.dislike(eventId, userId.get());
 
-        return ResponseEntity.ok()
+        return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .build();
     }

@@ -11,12 +11,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -68,33 +69,15 @@ public class EventReactionServiceImpl implements EventReactionService {
             return new ReactionsCountDto(likes, dislikes);
         }
 
-        // Cache miss: собираем все события с таким же названием
-        final List<Event> sameTitleEvents = eventService.findAllByTitle(title);
-        final List<String> eventIds = sameTitleEvents.stream().map(Event::getId).toList();
-
-        // Запрашиваем реакции из Cassandra по всем event_id
-        final List<EventReaction> reactions = cassandraRepo.findByEventIdIn(eventIds);
-
-        long likes = 0;
-        long dislikes = 0;
-        for (final EventReaction r : reactions) {
-            if (r.getLikeValue() == 1) {
-                likes++;
-            } else {
-                dislikes++;
-            }
-        }
+        // Cache miss: считаем из Cassandra
+        final ReactionsCountDto counts = countReactionsFromCassandra(title);
 
         // Кэшируем в Redis с TTL
-        if (likes > 0 || dislikes > 0) {
-            redisTemplate.opsForHash().putAll(cacheKey, Map.of(
-                    "likes", String.valueOf(likes),
-                    "dislikes", String.valueOf(dislikes)
-            ));
-            redisTemplate.expire(cacheKey, Duration.ofSeconds(ttl));
+        if (counts.likes() > 0 || counts.dislikes() > 0) {
+            cacheReactions(cacheKey, counts.likes(), counts.dislikes());
         }
 
-        return new ReactionsCountDto(likes, dislikes);
+        return counts;
     }
 
     private void saveReaction(final String eventId, final String userId, final byte value) {
@@ -131,6 +114,11 @@ public class EventReactionServiceImpl implements EventReactionService {
         final String title = event.getTitle();
         final String cacheKey = buildKey(title);
 
+        final ReactionsCountDto counts = countReactionsFromCassandra(title);
+        cacheReactions(cacheKey, counts.likes(), counts.dislikes());
+    }
+
+    private ReactionsCountDto countReactionsFromCassandra(final String title) {
         final List<Event> sameTitleEvents = eventService.findAllByTitle(title);
         final List<String> eventIds = sameTitleEvents.stream().map(Event::getId).toList();
 
@@ -145,11 +133,26 @@ public class EventReactionServiceImpl implements EventReactionService {
                 dislikes++;
             }
         }
+        return new ReactionsCountDto(likes, dislikes);
+    }
 
-        redisTemplate.opsForHash().putAll(cacheKey, Map.of(
-                "likes", String.valueOf(likes),
-                "dislikes", String.valueOf(dislikes)
-        ));
-        redisTemplate.expire(cacheKey, Duration.ofSeconds(ttl));
+    private void cacheReactions(final String key, final long likes, final long dislikes) {
+        final String script = """
+                redis.call('HSET', KEYS[1], 'likes', ARGV[1], 'dislikes', ARGV[2])
+                redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
+                return 1
+                """;
+
+        final DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
+        redisScript.setScriptText(script);
+        redisScript.setResultType(Long.class);
+
+        redisTemplate.execute(
+                redisScript,
+                Collections.singletonList(key),
+                String.valueOf(likes),
+                String.valueOf(dislikes),
+                String.valueOf(ttl)
+        );
     }
 }

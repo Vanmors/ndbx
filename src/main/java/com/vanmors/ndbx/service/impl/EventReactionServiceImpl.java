@@ -42,16 +42,16 @@ public class EventReactionServiceImpl implements EventReactionService {
 
     @Override
     public void like(final String eventId, final String userId) {
-        eventService.findByIdForReaction(eventId);
+        final Event event = eventService.findByIdForReaction(eventId);
         saveReaction(eventId, userId, (byte) 1);
-        invalidateCacheByEventId(eventId);
+        refreshCacheByEvent(event);
     }
 
     @Override
     public void dislike(final String eventId, final String userId) {
-        eventService.findByIdForReaction(eventId);
+        final Event event = eventService.findByIdForReaction(eventId);
         saveReaction(eventId, userId, (byte) -1);
-        invalidateCacheByEventId(eventId);
+        refreshCacheByEvent(event);
     }
 
     @Override
@@ -127,9 +127,29 @@ public class EventReactionServiceImpl implements EventReactionService {
         }
     }
 
-    private void invalidateCacheByEventId(final String eventId) {
-        final Event event = eventService.findById(eventId);
-        final String key = buildKey(event.getTitle());
-        redisTemplate.delete(key);
+    private void refreshCacheByEvent(final Event event) {
+        final String title = event.getTitle();
+        final String cacheKey = buildKey(title);
+
+        final List<Event> sameTitleEvents = eventService.findAllByTitle(title);
+        final List<String> eventIds = sameTitleEvents.stream().map(Event::getId).toList();
+
+        final List<EventReaction> reactions = cassandraRepo.findByEventIdIn(eventIds);
+
+        long likes = 0;
+        long dislikes = 0;
+        for (final EventReaction r : reactions) {
+            if (r.getLikeValue() == 1) {
+                likes++;
+            } else {
+                dislikes++;
+            }
+        }
+
+        redisTemplate.opsForHash().putAll(cacheKey, Map.of(
+                "likes", String.valueOf(likes),
+                "dislikes", String.valueOf(dislikes)
+        ));
+        redisTemplate.expire(cacheKey, Duration.ofSeconds(ttl));
     }
 }

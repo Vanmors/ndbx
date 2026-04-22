@@ -243,6 +243,11 @@ public class EventServiceImpl implements EventService {
                 .orElseThrow(() -> new NoSuchElementException("Not found"));
     }
 
+    public Event findByIdForReaction(final String id) {
+        return eventRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Event not found"));
+    }
+
     @Override
     public Page<EventDto> findByUser(final String createdBy, final int limit, final int offset) {
 
@@ -264,5 +269,10 @@ public class EventServiceImpl implements EventService {
     @Override
     public List<Event> findAll() {
         return eventRepository.findAll();
+    }
+
+    @Override
+    public List<Event> findAllByTitle(final String title) {
+        return eventRepository.findAllByTitle(title);
     }
 }

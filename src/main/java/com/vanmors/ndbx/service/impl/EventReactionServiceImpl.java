@@ -1,0 +1,135 @@
+package com.vanmors.ndbx.service.impl;
+
+
+import com.vanmors.ndbx.dao.EventReactionRepository;
+import com.vanmors.ndbx.dto.ReactionsCountDto;
+import com.vanmors.ndbx.entity.Event;
+import com.vanmors.ndbx.entity.EventReaction;
+import com.vanmors.ndbx.service.EventReactionService;
+import com.vanmors.ndbx.service.EventService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+
+@Service
+public class EventReactionServiceImpl implements EventReactionService {
+    private static final Logger log = LoggerFactory.getLogger(EventReactionServiceImpl.class);
+
+    private final EventReactionRepository cassandraRepo;
+
+    private final EventService eventService;
+
+    private final StringRedisTemplate redisTemplate;
+
+    @Value("${app.like.ttl-seconds}")
+    private long ttl;
+
+    public EventReactionServiceImpl(final EventReactionRepository cassandraRepo, final StringRedisTemplate redisTemplate, final EventService eventService) {
+        this.cassandraRepo = cassandraRepo;
+        this.redisTemplate = redisTemplate;
+        this.eventService = eventService;
+    }
+
+    @Override
+    public void like(final String eventId, final String userId) {
+        eventService.findByIdForReaction(eventId);
+        saveReaction(eventId, userId, (byte) 1);
+        invalidateCacheByEventId(eventId);
+    }
+
+    @Override
+    public void dislike(final String eventId, final String userId) {
+        eventService.findByIdForReaction(eventId);
+        saveReaction(eventId, userId, (byte) -1);
+        invalidateCacheByEventId(eventId);
+    }
+
+    @Override
+    public ReactionsCountDto getReactions(final String eventId) {
+        final Event event = eventService.findByIdForReaction(eventId);
+        final String title = event.getTitle();
+        final String cacheKey = buildKey(title);
+
+        // Cache-Aside: проверяем Redis
+        final Map<Object, Object> cached = redisTemplate.opsForHash().entries(cacheKey);
+        if (!cached.isEmpty()) {
+            final long likes = Long.parseLong((String) cached.getOrDefault("likes", "0"));
+            final long dislikes = Long.parseLong((String) cached.getOrDefault("dislikes", "0"));
+            return new ReactionsCountDto(likes, dislikes);
+        }
+
+        // Cache miss: собираем все события с таким же названием
+        final List<Event> sameTitleEvents = eventService.findAllByTitle(title);
+        final List<String> eventIds = sameTitleEvents.stream().map(Event::getId).toList();
+
+        // Запрашиваем реакции из Cassandra по всем event_id
+        final List<EventReaction> reactions = cassandraRepo.findByEventIdIn(eventIds);
+
+        long likes = 0;
+        long dislikes = 0;
+        for (final EventReaction r : reactions) {
+            if (r.getLikeValue() == 1) {
+                likes++;
+            } else {
+                dislikes++;
+            }
+        }
+
+        // Кэшируем в Redis с TTL
+        if (likes > 0 || dislikes > 0) {
+            redisTemplate.opsForHash().putAll(cacheKey, Map.of(
+                    "likes", String.valueOf(likes),
+                    "dislikes", String.valueOf(dislikes)
+            ));
+            redisTemplate.expire(cacheKey, Duration.ofSeconds(ttl));
+        }
+
+        return new ReactionsCountDto(likes, dislikes);
+    }
+
+    private void saveReaction(final String eventId, final String userId, final byte value) {
+        final EventReaction reaction = new EventReaction();
+        reaction.setEventId(eventId);
+        reaction.setCreatedBy(userId);
+        reaction.setLikeValue(value);
+        reaction.setCreatedAt(Instant.now());
+
+        cassandraRepo.save(reaction);
+    }
+
+    private String buildKey(final String title) {
+        return "events:" + md5(title) + ":reactions";
+    }
+
+    private String md5(final String input) {
+        try {
+            final MessageDigest md = MessageDigest.getInstance("MD5");
+            final byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
+
+            final StringBuilder sb = new StringBuilder();
+            for (final byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+
+        } catch (final Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void invalidateCacheByEventId(final String eventId) {
+        final Event event = eventService.findById(eventId);
+        final String key = buildKey(event.getTitle());
+        redisTemplate.delete(key);
+    }
+}

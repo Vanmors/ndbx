@@ -11,7 +11,6 @@ import java.time.Instant;
 @Table("event_reactions")
 public class EventReaction {
 
-    @Indexed
     @PrimaryKeyColumn(name = "event_id", ordinal = 0, type = PrimaryKeyType.PARTITIONED)
     private String eventId;
 

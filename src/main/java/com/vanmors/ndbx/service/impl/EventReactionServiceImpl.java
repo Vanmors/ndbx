@@ -79,7 +79,6 @@ public class EventReactionServiceImpl implements EventReactionService {
         return counts;
     }
 
-    // --- Cassandra ---
 
     private void saveReaction(final String eventId, final String userId, final byte value) {
         final EventReaction reaction = new EventReaction();
@@ -108,7 +107,6 @@ public class EventReactionServiceImpl implements EventReactionService {
         return new ReactionsCountDto(likes, dislikes);
     }
 
-    // --- Redis cache ---
 
     private ReactionsCountDto readReactionsFromCache(final String title) {
         final String primaryKey = cacheKey(title);
@@ -183,8 +181,6 @@ public class EventReactionServiceImpl implements EventReactionService {
             log.warn("Failed to invalidate reactions cache for title {}", title, e);
         }
     }
-
-    // --- Keys ---
 
     private static String cacheKey(final String title) {
         return CACHE_KEY_PATTERN.formatted(md5Hex(title));

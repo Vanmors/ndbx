@@ -2,6 +2,7 @@ package com.vanmors.ndbx.entity;
 
 import org.springframework.data.cassandra.core.cql.PrimaryKeyType;
 import org.springframework.data.cassandra.core.mapping.Column;
+import org.springframework.data.cassandra.core.mapping.Indexed;
 import org.springframework.data.cassandra.core.mapping.PrimaryKeyColumn;
 import org.springframework.data.cassandra.core.mapping.Table;
 
@@ -13,9 +14,11 @@ public class EventReaction {
     @PrimaryKeyColumn(name = "event_id", ordinal = 0, type = PrimaryKeyType.PARTITIONED)
     private String eventId;
 
+    @Indexed
     @PrimaryKeyColumn(name = "created_by", ordinal = 1, type = PrimaryKeyType.CLUSTERED)
     private String createdBy;
 
+    @Indexed
     @Column("like_value")
     private byte likeValue;
 

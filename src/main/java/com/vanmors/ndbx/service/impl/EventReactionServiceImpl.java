@@ -11,13 +11,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -137,22 +136,15 @@ public class EventReactionServiceImpl implements EventReactionService {
     }
 
     private void cacheReactions(final String key, final long likes, final long dislikes) {
-        final String script = """
-                redis.call('HSET', KEYS[1], 'likes', ARGV[1], 'dislikes', ARGV[2])
-                redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))
-                return 1
-                """;
-
-        final DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
-        redisScript.setScriptText(script);
-        redisScript.setResultType(Long.class);
-
-        redisTemplate.execute(
-                redisScript,
-                Collections.singletonList(key),
-                String.valueOf(likes),
-                String.valueOf(dislikes),
-                String.valueOf(ttl)
-        );
+        try {
+            final Map<String, String> values = Map.of(
+                    "likes", String.valueOf(likes),
+                    "dislikes", String.valueOf(dislikes)
+            );
+            redisTemplate.opsForHash().putAll(key, values);
+            redisTemplate.expire(key, Duration.ofSeconds(ttl));
+        } catch (final Exception e) {
+            log.warn("Failed to write reactions cache for key {}", key, e);
+        }
     }
 }

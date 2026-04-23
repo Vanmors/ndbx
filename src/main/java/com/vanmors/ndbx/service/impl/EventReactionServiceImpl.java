@@ -15,8 +15,10 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -90,22 +92,16 @@ public class EventReactionServiceImpl implements EventReactionService {
     }
 
     private String buildKey(final String title) {
-        return "events:" + md5(title) + ":reactions";
+        return "events:" + md5Hex(title) + ":reactions";
     }
 
-    private String md5(final String input) {
+    private static String md5Hex(final String value) {
         try {
-            final MessageDigest md = MessageDigest.getInstance("MD5");
-            final byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
-
-            final StringBuilder sb = new StringBuilder();
-            for (final byte b : digest) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-
-        } catch (final Exception e) {
-            throw new RuntimeException(e);
+            final MessageDigest md5 = MessageDigest.getInstance("MD5");
+            final byte[] digest = md5.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (final NoSuchAlgorithmException e) {
+            throw new IllegalStateException("MD5 is not available", e);
         }
     }
 

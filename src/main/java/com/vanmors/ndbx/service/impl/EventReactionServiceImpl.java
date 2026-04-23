@@ -10,7 +10,7 @@ import com.vanmors.ndbx.service.EventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -29,12 +29,12 @@ public class EventReactionServiceImpl implements EventReactionService {
 
     private final EventService eventService;
 
-    private final StringRedisTemplate redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Value("${app.like.ttl-seconds}")
     private long ttl;
 
-    public EventReactionServiceImpl(final EventReactionRepository cassandraRepo, final StringRedisTemplate redisTemplate, final EventService eventService) {
+    public EventReactionServiceImpl(final EventReactionRepository cassandraRepo, final RedisTemplate<String, Object> redisTemplate, final EventService eventService) {
         this.cassandraRepo = cassandraRepo;
         this.redisTemplate = redisTemplate;
         this.eventService = eventService;

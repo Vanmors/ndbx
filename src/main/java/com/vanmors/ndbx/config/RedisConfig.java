@@ -26,6 +26,9 @@ public class RedisConfig {
     @Value("${spring.data.redis.password}")
     private String password;
 
+    @Value("${spring.data.redis.database}")
+    private int database;
+
     @Value("${spring.data.redis.timeout}")
     private int timeout;
 
@@ -34,6 +37,7 @@ public class RedisConfig {
         final RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
         config.setHostName(host);
         config.setPort(port);
+        config.setDatabase(database);
 
         if (!password.isEmpty()) {
             config.setPassword(password);

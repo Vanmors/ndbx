@@ -10,13 +10,12 @@ import com.vanmors.ndbx.service.EventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import redis.clients.jedis.JedisPooled;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
@@ -27,18 +26,23 @@ import java.util.Map;
 public class EventReactionServiceImpl implements EventReactionService {
     private static final Logger log = LoggerFactory.getLogger(EventReactionServiceImpl.class);
 
+    private static final String CACHE_KEY_PATTERN = "events:%s:reactions";
+    private static final String CACHE_COMPAT_KEY_PATTERN = "event:%s:reactions";
+    private static final String CACHE_FIELD_LIKES = "likes";
+    private static final String CACHE_FIELD_DISLIKES = "dislikes";
+
     private final EventReactionRepository cassandraRepo;
-
     private final EventService eventService;
-
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final JedisPooled reactionsCache;
 
     @Value("${app.like.ttl-seconds}")
-    private long ttl;
+    private long likeTtlSeconds;
 
-    public EventReactionServiceImpl(final EventReactionRepository cassandraRepo, final RedisTemplate<String, Object> redisTemplate, final EventService eventService) {
+    public EventReactionServiceImpl(final EventReactionRepository cassandraRepo,
+                                    final JedisPooled reactionsCache,
+                                    final EventService eventService) {
         this.cassandraRepo = cassandraRepo;
-        this.redisTemplate = redisTemplate;
+        this.reactionsCache = reactionsCache;
         this.eventService = eventService;
     }
 
@@ -46,40 +50,36 @@ public class EventReactionServiceImpl implements EventReactionService {
     public void like(final String eventId, final String userId) {
         final Event event = eventService.findByIdForReaction(eventId);
         saveReaction(eventId, userId, (byte) 1);
-        refreshCacheByEvent(event);
+        refreshReactionsCacheByTitle(event.getTitle());
     }
 
     @Override
     public void dislike(final String eventId, final String userId) {
         final Event event = eventService.findByIdForReaction(eventId);
         saveReaction(eventId, userId, (byte) -1);
-        refreshCacheByEvent(event);
+        refreshReactionsCacheByTitle(event.getTitle());
     }
 
     @Override
     public ReactionsCountDto getReactions(final String eventId) {
         final Event event = eventService.findByIdForReaction(eventId);
         final String title = event.getTitle();
-        final String cacheKey = buildKey(title);
 
-        // Cache-Aside: проверяем Redis
-        final Map<Object, Object> cached = redisTemplate.opsForHash().entries(cacheKey);
-        if (!cached.isEmpty()) {
-            final long likes = Long.parseLong((String) cached.getOrDefault("likes", "0"));
-            final long dislikes = Long.parseLong((String) cached.getOrDefault("dislikes", "0"));
-            return new ReactionsCountDto(likes, dislikes);
+        final ReactionsCountDto cached = readReactionsFromCache(title);
+        if (cached != null) {
+            return cached;
         }
 
-        // Cache miss: считаем из Cassandra
         final ReactionsCountDto counts = countReactionsFromCassandra(title);
 
-        // Кэшируем в Redis с TTL
         if (counts.likes() > 0 || counts.dislikes() > 0) {
-            cacheReactions(cacheKey, counts.likes(), counts.dislikes());
+            storeReactionsInCache(title, counts);
         }
 
         return counts;
     }
+
+    // --- Cassandra ---
 
     private void saveReaction(final String eventId, final String userId, final byte value) {
         final EventReaction reaction = new EventReaction();
@@ -87,12 +87,111 @@ public class EventReactionServiceImpl implements EventReactionService {
         reaction.setCreatedBy(userId);
         reaction.setLikeValue(value);
         reaction.setCreatedAt(Instant.now());
-
         cassandraRepo.save(reaction);
     }
 
-    private String buildKey(final String title) {
-        return "events:" + md5Hex(title) + ":reactions";
+    private ReactionsCountDto countReactionsFromCassandra(final String title) {
+        final List<Event> sameTitleEvents = eventService.findAllByTitle(title);
+
+        long likes = 0;
+        long dislikes = 0;
+        for (final Event event : sameTitleEvents) {
+            final List<EventReaction> reactions = cassandraRepo.findByEventId(event.getId());
+            for (final EventReaction r : reactions) {
+                if (r.getLikeValue() == 1) {
+                    likes++;
+                } else if (r.getLikeValue() == -1) {
+                    dislikes++;
+                }
+            }
+        }
+        return new ReactionsCountDto(likes, dislikes);
+    }
+
+    // --- Redis cache ---
+
+    private ReactionsCountDto readReactionsFromCache(final String title) {
+        final String primaryKey = cacheKey(title);
+        ReactionsCountDto reactions = readFromCacheKey(primaryKey);
+        if (reactions != null) {
+            return reactions;
+        }
+
+        final String compatKey = compatCacheKey(title);
+        reactions = readFromCacheKey(compatKey);
+        if (reactions != null) {
+            storeInCacheByKey(primaryKey, reactions);
+        }
+
+        return reactions;
+    }
+
+    private ReactionsCountDto readFromCacheKey(final String cacheKey) {
+        final Map<String, String> values = reactionsCache.hgetAll(cacheKey);
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+
+        final String likesStr = values.get(CACHE_FIELD_LIKES);
+        final String dislikesStr = values.get(CACHE_FIELD_DISLIKES);
+        if (likesStr == null || dislikesStr == null) {
+            return null;
+        }
+
+        try {
+            return new ReactionsCountDto(Long.parseLong(likesStr.trim()), Long.parseLong(dislikesStr.trim()));
+        } catch (final NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private void storeReactionsInCache(final String title, final ReactionsCountDto reactions) {
+        storeInCacheByKey(cacheKey(title), reactions);
+        storeInCacheByKey(compatCacheKey(title), reactions);
+    }
+
+    private void storeInCacheByKey(final String cacheKey, final ReactionsCountDto reactions) {
+        try {
+            final Map<String, String> values = Map.of(
+                    CACHE_FIELD_LIKES, String.valueOf(reactions.likes()),
+                    CACHE_FIELD_DISLIKES, String.valueOf(reactions.dislikes())
+            );
+            reactionsCache.hset(cacheKey, values);
+            reactionsCache.expire(cacheKey, likeTtlSeconds);
+        } catch (final Exception e) {
+            log.warn("Failed to write reactions cache for key {}", cacheKey, e);
+        }
+    }
+
+    private void refreshReactionsCacheByTitle(final String title) {
+        if (title == null || title.isBlank()) {
+            return;
+        }
+
+        final ReactionsCountDto counts = countReactionsFromCassandra(title);
+        if (counts.likes() > 0 || counts.dislikes() > 0) {
+            storeReactionsInCache(title, counts);
+        } else {
+            invalidateCache(title);
+        }
+    }
+
+    private void invalidateCache(final String title) {
+        try {
+            reactionsCache.del(cacheKey(title), compatCacheKey(title));
+        } catch (final Exception e) {
+            log.warn("Failed to invalidate reactions cache for title {}", title, e);
+        }
+    }
+
+    // --- Keys ---
+
+    private static String cacheKey(final String title) {
+        return CACHE_KEY_PATTERN.formatted(md5Hex(title));
+    }
+
+    private static String compatCacheKey(final String title) {
+        return CACHE_COMPAT_KEY_PATTERN.formatted(md5Hex(title));
     }
 
     private static String md5Hex(final String value) {
@@ -102,45 +201,6 @@ public class EventReactionServiceImpl implements EventReactionService {
             return HexFormat.of().formatHex(digest);
         } catch (final NoSuchAlgorithmException e) {
             throw new IllegalStateException("MD5 is not available", e);
-        }
-    }
-
-    private void refreshCacheByEvent(final Event event) {
-        final String title = event.getTitle();
-        final String cacheKey = buildKey(title);
-
-        final ReactionsCountDto counts = countReactionsFromCassandra(title);
-        cacheReactions(cacheKey, counts.likes(), counts.dislikes());
-    }
-
-    private ReactionsCountDto countReactionsFromCassandra(final String title) {
-        final List<Event> sameTitleEvents = eventService.findAllByTitle(title);
-        final List<String> eventIds = sameTitleEvents.stream().map(Event::getId).toList();
-
-        final List<EventReaction> reactions = cassandraRepo.findByEventIdIn(eventIds);
-
-        long likes = 0;
-        long dislikes = 0;
-        for (final EventReaction r : reactions) {
-            if (r.getLikeValue() == 1) {
-                likes++;
-            } else {
-                dislikes++;
-            }
-        }
-        return new ReactionsCountDto(likes, dislikes);
-    }
-
-    private void cacheReactions(final String key, final long likes, final long dislikes) {
-        try {
-            final Map<String, String> values = Map.of(
-                    "likes", String.valueOf(likes),
-                    "dislikes", String.valueOf(dislikes)
-            );
-            redisTemplate.opsForHash().putAll(key, values);
-            redisTemplate.expire(key, Duration.ofSeconds(ttl));
-        } catch (final Exception e) {
-            log.warn("Failed to write reactions cache for key {}", key, e);
         }
     }
 }

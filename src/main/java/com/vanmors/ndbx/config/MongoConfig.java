@@ -4,6 +4,8 @@ import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
+import com.vanmors.ndbx.converter.SafeCategoryReadConverter;
+import com.vanmors.ndbx.converter.SafeCategoryWriteConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +13,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.config.AbstractMongoClientConfiguration;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
+
+import java.util.List;
+
 
 @Configuration
 public class MongoConfig extends AbstractMongoClientConfiguration {
@@ -33,25 +39,19 @@ public class MongoConfig extends AbstractMongoClientConfiguration {
     private String password;
 
     @Bean
+    @Override
     public MongoClient mongoClient() {
-        final StringBuilder uri = new StringBuilder("mongodb://");
+        final String uri = String.format(
+                "mongodb://%s:%s@%s:%d/%s?authSource=%s&retryWrites=true",
+                username,
+                password,
+                host,
+                port,
+                database,
+                database
+        );
 
-        if (!username.isEmpty() && !password.isEmpty()) {
-            uri.append(username).append(":").append(password).append("@");
-        }
-
-        uri.append(host).append(":").append(port).append("/").append(database);
-
-        if (!username.isEmpty()) {
-            uri.append("?authSource=admin");
-        }
-
-        final String connectionString = uri.toString();
-        log.info("MongoDB connection string: {}", connectionString.replace(password, "****"));
-
-        return MongoClients.create(MongoClientSettings.builder()
-                .applyConnectionString(new ConnectionString(connectionString))
-                .build());
+        return MongoClients.create(uri);
     }
 
     @Bean
@@ -67,5 +67,13 @@ public class MongoConfig extends AbstractMongoClientConfiguration {
     @Override
     public boolean autoIndexCreation() {
         return true;
+    }
+
+    @Bean
+    public MongoCustomConversions customConversions() {
+        return new MongoCustomConversions(List.of(
+                new SafeCategoryReadConverter(),
+                new SafeCategoryWriteConverter()
+        ));
     }
 }

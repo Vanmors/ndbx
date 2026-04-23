@@ -16,8 +16,12 @@ public class Event {
     @Id
     private String id;
 
-    @Indexed(unique = true)
+    @Indexed
     private String title;
+
+    private Category category;
+
+    private Long price;
 
     private String description;
 
@@ -25,7 +29,7 @@ public class Event {
 
     private Instant created_at = Instant.now();
 
-    @Indexed
+    @Indexed(name = "created_by_1")
     private String created_by;
 
     private Instant started_at;
@@ -53,6 +57,22 @@ public class Event {
 
     public void setTitle(final String title) {
         this.title = title;
+    }
+
+    public Category getCategory() {
+        return category;
+    }
+
+    public void setCategory(final Category category) {
+        this.category = category;
+    }
+
+    public Long getPrice() {
+        return price;
+    }
+
+    public void setPrice(final Long price) {
+        this.price = price;
     }
 
     public String getDescription() {
@@ -111,8 +131,27 @@ public class Event {
         this.participant_ids = participant_ids;
     }
 
+    @Override
+    public String toString() {
+        return "Event{" +
+                "id='" + id + '\'' +
+                ", title='" + title + '\'' +
+                ", category=" + category +
+                ", price=" + price +
+                ", description='" + description + '\'' +
+                ", location=" + location +
+                ", created_at=" + created_at +
+                ", created_by='" + created_by + '\'' +
+                ", started_at=" + started_at +
+                ", finished_at=" + finished_at +
+                ", participant_ids=" + participant_ids +
+                '}';
+    }
+
     public static class Location {
         private String address;
+
+        private String city;
 
         public Location() {
         }
@@ -123,6 +162,22 @@ public class Event {
 
         public void setAddress(final String address) {
             this.address = address;
+        }
+
+        public void setCity(final String city) {
+            this.city = city;
+        }
+
+        public String getCity() {
+            return city;
+        }
+
+        @Override
+        public String toString() {
+            return "Location{" +
+                    "city='" + city + '\'' +
+                    ", address='" + address + '\'' +
+                    '}';
         }
     }
 }

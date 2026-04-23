@@ -13,17 +13,15 @@ public class SafeCategoryReadConverter implements Converter<String, Category> {
 
     @Override
     public Category convert(final String source) {
-//        log.info("try read={}", source);
         if (source == null || source.isBlank()) {
-            return null; // или Category.other
+            return null;
         }
 
         try {
             return Category.valueOf(source.toLowerCase());
         } catch (final IllegalArgumentException ex) {
-            // логируем мусор
             log.info("Unknown category value from DB: {}", source);
-            return null; // или Category.other
+            return null;
         }
     }
 }

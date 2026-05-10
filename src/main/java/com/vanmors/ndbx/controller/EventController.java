@@ -11,7 +11,6 @@ import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.SessionService;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -211,9 +210,9 @@ public class EventController {
     }
 
     @PostMapping("/{id}/reviews")
-    public ResponseEntity<Map<String, String>> createReview(
+    public ResponseEntity<?> createReview(
             @PathVariable(name = "id") final String eventId,
-            @Valid @RequestBody final ReviewRequestDto dto,
+            @RequestBody final ReviewRequestDto dto,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
 
         final Optional<String> userId = sessionService.getUserIdFromSession(sid);
@@ -222,6 +221,17 @@ public class EventController {
         }
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
+
+        if (dto.comment() == null || dto.comment().length() > 300) {
+            return ResponseEntity.badRequest()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", "invalid \"comment\" field"));
+        }
+        if (dto.rating() == null || dto.rating() < 1 || dto.rating() > 5) {
+            return ResponseEntity.badRequest()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", "invalid \"rating\" field"));
+        }
 
         final UUID reviewId = eventReviewService.createReview(eventId, dto.comment(), dto.rating(), userId.get());
 
@@ -231,15 +241,29 @@ public class EventController {
     }
 
     @GetMapping("/{id}/reviews")
-    public ResponseEntity<ReviewsResponse> getReviews(
+    public ResponseEntity<?> getReviews(
             @PathVariable(name = "id") final String eventId,
-            @Min(0) @RequestParam(name = "limit", defaultValue = "10") final int limit,
-            @Min(0) @RequestParam(name = "offset", defaultValue = "0") final int offset,
+            @RequestParam(name = "limit", required = false) final Integer limit,
+            @RequestParam(name = "offset", required = false) final Integer offset,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
-        final List<ReviewResponseDto> reviews = eventReviewService.getReviews(eventId, limit, offset);
+        final int effectiveLimit = (limit != null) ? limit : 10;
+        final int effectiveOffset = (offset != null) ? offset : 0;
+
+        if (effectiveLimit < 0) {
+            return ResponseEntity.badRequest()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", "invalid \"limit\" field"));
+        }
+        if (effectiveOffset < 0) {
+            return ResponseEntity.badRequest()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", "invalid \"offset\" field"));
+        }
+
+        final List<ReviewResponseDto> reviews = eventReviewService.getReviews(eventId, effectiveLimit, effectiveOffset);
         final long count = reviews.size();
 
         return ResponseEntity.ok()
@@ -248,10 +272,10 @@ public class EventController {
     }
 
     @PatchMapping("/{eventId}/reviews/{reviewId}")
-    public ResponseEntity<Void> patchReview(
+    public ResponseEntity<?> patchReview(
             @PathVariable(name = "eventId") final String eventId,
             @PathVariable(name = "reviewId") final String reviewId,
-            @Valid @RequestBody final ReviewPatchDto dto,
+            @RequestBody final ReviewPatchDto dto,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
 
         final Optional<String> userId = sessionService.getUserIdFromSession(sid);
@@ -260,6 +284,17 @@ public class EventController {
         }
 
         final ResponseCookie cookie = cookieBuilder.build(sid);
+
+        if (dto.rating() != null && (dto.rating() < 1 || dto.rating() > 5)) {
+            return ResponseEntity.badRequest()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", "invalid \"rating\" field"));
+        }
+        if (dto.comment() != null && dto.comment().length() > 300) {
+            return ResponseEntity.badRequest()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", "invalid \"comment\" field"));
+        }
 
         eventReviewService.patchReview(eventId, reviewId, dto.rating(), dto.comment(), userId.get());
 

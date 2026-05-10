@@ -8,6 +8,7 @@ import com.vanmors.ndbx.dto.UserRegistrationDto;
 import com.vanmors.ndbx.entity.Category;
 import com.vanmors.ndbx.entity.User;
 import com.vanmors.ndbx.service.EventReactionService;
+import com.vanmors.ndbx.service.EventReviewService;
 import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/users")
@@ -36,12 +38,16 @@ public class UserController {
 
     private final EventReactionService eventReactionService;
 
+    private final EventReviewService eventReviewService;
+
     @Autowired
-    public UserController(final UserService userService, final CookieBuilder cookieBuilder, final EventService eventService, final EventReactionService eventReactionService) {
+    public UserController(final UserService userService, final CookieBuilder cookieBuilder, final EventService eventService,
+                          final EventReactionService eventReactionService, final EventReviewService eventReviewService) {
         this.userService = userService;
         this.cookieBuilder = cookieBuilder;
         this.eventService = eventService;
         this.eventReactionService = eventReactionService;
+        this.eventReviewService = eventReviewService;
     }
 
     @PostMapping
@@ -107,14 +113,27 @@ public class UserController {
         );
 
         List<EventDto> events = page.getContent();
-        if ("reactions".equals(include)) {
+        final Set<String> includes = parseIncludes(include);
+        if (includes.contains("reactions")) {
             events = events.stream()
                     .map(dto -> dto.withReactions(eventReactionService.getReactions(dto.id())))
+                    .toList();
+        }
+        if (includes.contains("reviews")) {
+            events = events.stream()
+                    .map(dto -> dto.withReviews(eventReviewService.getReviewsSummary(dto.id())))
                     .toList();
         }
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(new EventsResponse(events, page.getTotalElements()));
+    }
+
+    private static Set<String> parseIncludes(final String include) {
+        if (include == null || include.isBlank()) {
+            return Set.of();
+        }
+        return Set.of(include.split(","));
     }
 }

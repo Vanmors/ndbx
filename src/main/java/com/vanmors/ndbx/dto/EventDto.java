@@ -19,7 +19,9 @@ public record EventDto(
         Instant started_at,
         Instant finished_at,
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        ReactionsCountDto reactions
+        ReactionsCountDto reactions,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        ReviewsCountDto reviews
 ) {
     public static EventDto fromEntity(final Event event) {
         return fromEntity(event, null);
@@ -28,11 +30,15 @@ public record EventDto(
     public static EventDto fromEntity(final Event event, final ReactionsCountDto reactions) {
         final LocationDto locationDto = new LocationDto(event.getLocation().getCity(), event.getLocation().getAddress());
         return new EventDto(event.getId(), event.getTitle(), event.getCategory(), event.getPrice(), event.getDescription(), locationDto, event.getCreatedAt(),
-                event.getCreatedBy(), event.getStartedAt(), event.getFinishedAt(), reactions);
+                event.getCreatedBy(), event.getStartedAt(), event.getFinishedAt(), reactions, null);
     }
 
     public EventDto withReactions(final ReactionsCountDto reactions) {
-        return new EventDto(id, title, category, price, description, location, created_at, created_by, started_at, finished_at, reactions);
+        return new EventDto(id, title, category, price, description, location, created_at, created_by, started_at, finished_at, reactions, reviews);
+    }
+
+    public EventDto withReviews(final ReviewsCountDto reviews) {
+        return new EventDto(id, title, category, price, description, location, created_at, created_by, started_at, finished_at, reactions, reviews);
     }
 
     public static Event toEntity(final EventDto eventDto, final String userId) {

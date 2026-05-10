@@ -1,15 +1,17 @@
 package com.vanmors.ndbx.controller;
 
 import com.vanmors.ndbx.controller.response.EventsResponse;
-import com.vanmors.ndbx.dto.EventDto;
-import com.vanmors.ndbx.dto.EventPatchDto;
+import com.vanmors.ndbx.controller.response.ReviewsResponse;
+import com.vanmors.ndbx.dto.*;
 import com.vanmors.ndbx.entity.Category;
 import com.vanmors.ndbx.entity.Event;
 import com.vanmors.ndbx.service.EventReactionService;
+import com.vanmors.ndbx.service.EventReviewService;
 import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.SessionService;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,9 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 
 @RestController
@@ -41,6 +41,8 @@ public class EventController {
 
     private final EventReactionService eventReactionService;
 
+    private final EventReviewService eventReviewService;
+
     private final SessionService sessionService;
 
     private final CookieBuilder cookieBuilder;
@@ -48,9 +50,13 @@ public class EventController {
     private final MongoTemplate mongoTemplate;
 
     @Autowired
-    public EventController(final EventService eventService, final EventReactionService eventReactionService, final SessionService sessionService, final CookieBuilder cookieBuilder, final ObjectMapper objectMapper, final MongoTemplate mongoTemplate) {
+    public EventController(final EventService eventService, final EventReactionService eventReactionService,
+                           final EventReviewService eventReviewService,
+                           final SessionService sessionService, final CookieBuilder cookieBuilder,
+                           final ObjectMapper objectMapper, final MongoTemplate mongoTemplate) {
         this.eventService = eventService;
         this.eventReactionService = eventReactionService;
+        this.eventReviewService = eventReviewService;
         this.sessionService = sessionService;
         this.cookieBuilder = cookieBuilder;
         this.objectMapper = objectMapper;
@@ -107,8 +113,12 @@ public class EventController {
                 date_from, date_to, user, limit, offset);
 
         List<EventDto> events = page.getContent();
-        if ("reactions".equals(include)) {
+        final Set<String> includes = parseIncludes(include);
+        if (includes.contains("reactions")) {
             events = enrichWithReactions(events);
+        }
+        if (includes.contains("reviews")) {
+            events = enrichWithReviews(events);
         }
 
         return ResponseEntity.ok()
@@ -151,8 +161,12 @@ public class EventController {
         final Event event = eventService.findById(id);
 
         EventDto dto = EventDto.fromEntity(event);
-        if ("reactions".equals(include)) {
+        final Set<String> includes = parseIncludes(include);
+        if (includes.contains("reactions")) {
             dto = dto.withReactions(eventReactionService.getReactions(event.getId()));
+        }
+        if (includes.contains("reviews")) {
+            dto = dto.withReviews(eventReviewService.getReviewsSummary(event.getId()));
         }
 
         return ResponseEntity.ok()
@@ -196,10 +210,81 @@ public class EventController {
                 .build();
     }
 
+    @PostMapping("/{id}/reviews")
+    public ResponseEntity<Map<String, String>> createReview(
+            @PathVariable(name = "id") final String eventId,
+            @Valid @RequestBody final ReviewRequestDto dto,
+            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+
+        final Optional<String> userId = sessionService.getUserIdFromSession(sid);
+        if (sid == null || userId.isEmpty()) {
+            throw new UnauthorizedException("not authenticated");
+        }
+
+        final ResponseCookie cookie = cookieBuilder.build(sid);
+
+        final UUID reviewId = eventReviewService.createReview(eventId, dto.comment(), dto.rating(), userId.get());
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(Map.of("id", reviewId.toString()));
+    }
+
+    @GetMapping("/{id}/reviews")
+    public ResponseEntity<ReviewsResponse> getReviews(
+            @PathVariable(name = "id") final String eventId,
+            @Min(0) @RequestParam(name = "limit", defaultValue = "10") final int limit,
+            @Min(0) @RequestParam(name = "offset", defaultValue = "0") final int offset,
+            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+
+        final ResponseCookie cookie = cookieBuilder.build(sid);
+
+        final List<ReviewResponseDto> reviews = eventReviewService.getReviews(eventId, limit, offset);
+        final long count = reviews.size();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(new ReviewsResponse(reviews, count));
+    }
+
+    @PatchMapping("/{eventId}/reviews/{reviewId}")
+    public ResponseEntity<Void> patchReview(
+            @PathVariable(name = "eventId") final String eventId,
+            @PathVariable(name = "reviewId") final String reviewId,
+            @Valid @RequestBody final ReviewPatchDto dto,
+            @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+
+        final Optional<String> userId = sessionService.getUserIdFromSession(sid);
+        if (sid == null || userId.isEmpty()) {
+            throw new UnauthorizedException("not authenticated");
+        }
+
+        final ResponseCookie cookie = cookieBuilder.build(sid);
+
+        eventReviewService.patchReview(eventId, reviewId, dto.rating(), dto.comment(), userId.get());
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
+    }
+
     private List<EventDto> enrichWithReactions(final List<EventDto> events) {
         return events.stream()
                 .map(dto -> dto.withReactions(eventReactionService.getReactions(dto.id())))
                 .toList();
+    }
+
+    private List<EventDto> enrichWithReviews(final List<EventDto> events) {
+        return events.stream()
+                .map(dto -> dto.withReviews(eventReviewService.getReviewsSummary(dto.id())))
+                .toList();
+    }
+
+    private static Set<String> parseIncludes(final String include) {
+        if (include == null || include.isBlank()) {
+            return Set.of();
+        }
+        return Set.of(include.split(","));
     }
 
     private void logRequest(final String endpoint, final Object body, final String sid, final HttpServletRequest request) {

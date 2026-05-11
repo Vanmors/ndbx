@@ -9,6 +9,7 @@ import com.vanmors.ndbx.service.EventReactionService;
 import com.vanmors.ndbx.service.EventReviewService;
 import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.SessionService;
+import com.vanmors.ndbx.service.exception.AlreadyExistsException;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Min;
@@ -233,11 +234,21 @@ public class EventController {
                     .body(Map.of("message", "invalid \"rating\" field"));
         }
 
-        final UUID reviewId = eventReviewService.createReview(eventId, dto.comment(), dto.rating(), userId.get());
+        try {
+            final UUID reviewId = eventReviewService.createReview(eventId, dto.comment(), dto.rating(), userId.get());
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(Map.of("id", reviewId.toString()));
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("id", reviewId.toString()));
+        } catch (final AlreadyExistsException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", ex.getMessage()));
+        } catch (final NoSuchElementException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", ex.getMessage()));
+        }
     }
 
     @GetMapping("/{id}/reviews")
@@ -296,11 +307,17 @@ public class EventController {
                     .body(Map.of("message", "invalid \"comment\" field"));
         }
 
-        eventReviewService.patchReview(eventId, reviewId, dto.rating(), dto.comment(), userId.get());
+        try {
+            eventReviewService.patchReview(eventId, reviewId, dto.rating(), dto.comment(), userId.get());
 
-        return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .build();
+            return ResponseEntity.noContent()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .build();
+        } catch (final NoSuchElementException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of("message", ex.getMessage()));
+        }
     }
 
     private List<EventDto> enrichWithReactions(final List<EventDto> events) {

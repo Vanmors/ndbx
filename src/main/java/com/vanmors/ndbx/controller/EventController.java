@@ -5,6 +5,7 @@ import com.vanmors.ndbx.dto.EventDto;
 import com.vanmors.ndbx.dto.EventPatchDto;
 import com.vanmors.ndbx.entity.Category;
 import com.vanmors.ndbx.entity.Event;
+import com.vanmors.ndbx.service.EventReactionService;
 import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.SessionService;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
@@ -25,6 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 
 @RestController
@@ -37,6 +39,8 @@ public class EventController {
 
     private final EventService eventService;
 
+    private final EventReactionService eventReactionService;
+
     private final SessionService sessionService;
 
     private final CookieBuilder cookieBuilder;
@@ -44,8 +48,9 @@ public class EventController {
     private final MongoTemplate mongoTemplate;
 
     @Autowired
-    public EventController(final EventService eventService, final SessionService sessionService, final CookieBuilder cookieBuilder, final ObjectMapper objectMapper, final MongoTemplate mongoTemplate) {
+    public EventController(final EventService eventService, final EventReactionService eventReactionService, final SessionService sessionService, final CookieBuilder cookieBuilder, final ObjectMapper objectMapper, final MongoTemplate mongoTemplate) {
         this.eventService = eventService;
+        this.eventReactionService = eventReactionService;
         this.sessionService = sessionService;
         this.cookieBuilder = cookieBuilder;
         this.objectMapper = objectMapper;
@@ -62,15 +67,6 @@ public class EventController {
         final ResponseCookie cookie = cookieBuilder.build(sid);
 
         logRequest("Post /events/", dto, sid, request);
-        log.info("id={} ", dto.id());
-        log.info("title={} ", dto.title());
-        log.info("category={} ", dto.category());
-        log.info("price={} ", dto.price());
-        log.info("description={} ", dto.description());
-        log.info("location={} ", dto.location());
-        log.info("created_at={} ", dto.created_at());
-        log.info("created_by={} ", dto.created_by());
-        log.info("started_at={} ", dto.started_at());
 
         try {
             final Event event = eventService.createEvent(dto, sid);
@@ -96,14 +92,11 @@ public class EventController {
             @RequestParam(name = "date_from", required = false) final String date_from,
             @RequestParam(name = "date_to", required = false) final String date_to,
             @RequestParam(name = "user", required = false) final String user,
+            @RequestParam(name = "include", required = false) final String include,
             @Min(0) @RequestParam(name = "limit", defaultValue = "10") final int limit,
             @Min(0) @RequestParam(name = "offset", defaultValue = "0") final int offset,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
             final HttpServletRequest request) {
-
-//        mongoTemplate.getCollection("events")
-//                .find()
-//                .forEach(doc -> log.info("RAW BSON={}", doc.toJson()));
 
         logRequest("GET /events/", null, sid, request);
 
@@ -113,9 +106,14 @@ public class EventController {
                 id, title, category, price_from, price_to, city,
                 date_from, date_to, user, limit, offset);
 
+        List<EventDto> events = page.getContent();
+        if ("reactions".equals(include)) {
+            events = enrichWithReactions(events);
+        }
+
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(new EventsResponse(page.getContent(), page.getTotalElements()));
+                .body(new EventsResponse(events, page.getTotalElements()));
     }
 
     @PatchMapping("/{id}")
@@ -143,6 +141,7 @@ public class EventController {
     @GetMapping("/{id}")
     public ResponseEntity<EventDto> getEvent(
             @PathVariable(name = "id") final String id,
+            @RequestParam(name = "include", required = false) final String include,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid,
             final HttpServletRequest request) {
 
@@ -151,11 +150,57 @@ public class EventController {
         final ResponseCookie cookie = cookieBuilder.build(sid);
         final Event event = eventService.findById(id);
 
+        EventDto dto = EventDto.fromEntity(event);
+        if ("reactions".equals(include)) {
+            dto = dto.withReactions(eventReactionService.getReactions(event.getId()));
+        }
+
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(EventDto.fromEntity(event));
+                .body(dto);
     }
 
+    @PostMapping("/{id}/like")
+    public ResponseEntity<Void> likeEvent(@PathVariable(name = "id") final String eventId,
+                                          @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+
+        final Optional<String> userId = sessionService.getUserIdFromSession(sid);
+        if (sid == null || userId.isEmpty()) {
+            throw new UnauthorizedException("not authenticated");
+        }
+
+        final ResponseCookie cookie = cookieBuilder.build(sid);
+
+        eventReactionService.like(eventId, userId.get());
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
+    }
+
+    @PostMapping("/{id}/dislike")
+    public ResponseEntity<Void> dislikeEvent(@PathVariable(name = "id") final String eventId,
+                                             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid) {
+
+        final Optional<String> userId = sessionService.getUserIdFromSession(sid);
+        if (sid == null || userId.isEmpty()) {
+            throw new UnauthorizedException("not authenticated");
+        }
+
+        final ResponseCookie cookie = cookieBuilder.build(sid);
+
+        eventReactionService.dislike(eventId, userId.get());
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
+    }
+
+    private List<EventDto> enrichWithReactions(final List<EventDto> events) {
+        return events.stream()
+                .map(dto -> dto.withReactions(eventReactionService.getReactions(dto.id())))
+                .toList();
+    }
 
     private void logRequest(final String endpoint, final Object body, final String sid, final HttpServletRequest request) {
         final String sidShort = (sid != null && !sid.isBlank())

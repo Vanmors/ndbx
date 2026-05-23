@@ -7,6 +7,7 @@ import com.vanmors.ndbx.dto.UserDto;
 import com.vanmors.ndbx.dto.UserRegistrationDto;
 import com.vanmors.ndbx.entity.Category;
 import com.vanmors.ndbx.entity.User;
+import com.vanmors.ndbx.service.EventReactionService;
 import com.vanmors.ndbx.service.EventService;
 import com.vanmors.ndbx.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,6 +21,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 
 @RestController
 @RequestMapping("/users")
@@ -32,11 +34,14 @@ public class UserController {
 
     private final EventService eventService;
 
+    private final EventReactionService eventReactionService;
+
     @Autowired
-    public UserController(final UserService userService, final CookieBuilder cookieBuilder, final EventService eventService) {
+    public UserController(final UserService userService, final CookieBuilder cookieBuilder, final EventService eventService, final EventReactionService eventReactionService) {
         this.userService = userService;
         this.cookieBuilder = cookieBuilder;
         this.eventService = eventService;
+        this.eventReactionService = eventReactionService;
     }
 
     @PostMapping
@@ -86,6 +91,7 @@ public class UserController {
             @RequestParam(name = "city", required = false) final String city,
             @RequestParam(name = "date_from", required = false) final String dateFrom,
             @RequestParam(name = "date_to", required = false) final String dateTo,
+            @RequestParam(name = "include", required = false) final String include,
             @Min(0) @RequestParam(name = "limit", defaultValue = "10") final int limit,
             @Min(0) @RequestParam(name = "offset", defaultValue = "0") final int offset,
             @CookieValue(name = "${app.session.cookie-name}", required = false) final String sid
@@ -100,8 +106,15 @@ public class UserController {
                 limit, offset
         );
 
+        List<EventDto> events = page.getContent();
+        if ("reactions".equals(include)) {
+            events = events.stream()
+                    .map(dto -> dto.withReactions(eventReactionService.getReactions(dto.id())))
+                    .toList();
+        }
+
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(new EventsResponse(page.getContent(), page.getTotalElements()));
+                .body(new EventsResponse(events, page.getTotalElements()));
     }
 }

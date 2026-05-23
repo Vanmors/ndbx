@@ -23,7 +23,11 @@ public interface EventService {
 
     Event findById(String id);
 
+    Event findByIdForReaction(String id);
+
     Page<EventDto> findByUser(String createdBy, int limit, int offset);
 
     List<Event> findAll();
+
+    List<Event> findAllByTitle(String title);
 }

@@ -20,6 +20,8 @@ services:
         condition: service_healthy
       mongo-init:
         condition: service_completed_successfully
+      cassandra-init:
+        condition: service_completed_successfully
 
   redis:
     image: redis:8.0-alpine
@@ -115,6 +117,32 @@ services:
     volumes:
       - ./mongo-cluster-init.sh:/scripts/mongo-cluster-init.sh:ro
     entrypoint: ["/bin/bash", "/scripts/mongo-cluster-init.sh"]
+    restart: "no"
+
+
+  cassandra-test:
+    image: cassandra:4.1
+    env_file:
+      - .env.local
+    ports:
+      - "${CASSANDRA_PORT}:${CASSANDRA_PORT}"
+    healthcheck:
+      test: [ "CMD-SHELL", "cqlsh localhost ${CASSANDRA_PORT} -e \"DESCRIBE KEYSPACES\"" ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 40s
+
+  cassandra-init:
+    image: cassandra:4.1
+    env_file:
+      - .env.local
+    depends_on:
+      cassandra-test:
+        condition: service_healthy
+    volumes:
+      - ./cassandra-init.sh:/scripts/cassandra-init.sh:ro
+    entrypoint: ["/bin/bash", "/scripts/cassandra-init.sh"]
     restart: "no"
 
 volumes:

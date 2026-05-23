@@ -7,9 +7,11 @@ import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.jedis.JedisClientConfiguration;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericToStringSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import redis.clients.jedis.DefaultJedisClientConfig;
+import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.JedisPooled;
 
 import java.time.Duration;
 
@@ -26,6 +28,9 @@ public class RedisConfig {
     @Value("${spring.data.redis.password}")
     private String password;
 
+    @Value("${spring.data.redis.database}")
+    private int database;
+
     @Value("${spring.data.redis.timeout}")
     private int timeout;
 
@@ -34,6 +39,7 @@ public class RedisConfig {
         final RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
         config.setHostName(host);
         config.setPort(port);
+        config.setDatabase(database);
 
         if (!password.isEmpty()) {
             config.setPassword(password);
@@ -63,9 +69,12 @@ public class RedisConfig {
     }
 
     @Bean
-    public StringRedisTemplate stringRedisTemplate(final JedisConnectionFactory connectionFactory) {
-        final StringRedisTemplate template = new StringRedisTemplate();
-        template.setConnectionFactory(connectionFactory);
-        return template;
+    public JedisPooled jedisPooled() {
+        final DefaultJedisClientConfig.Builder config = DefaultJedisClientConfig.builder()
+                .database(database);
+        if (!password.isEmpty()) {
+            config.password(password);
+        }
+        return new JedisPooled(new HostAndPort(host, port), config.build());
     }
 }

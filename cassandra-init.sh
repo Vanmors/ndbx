@@ -24,6 +24,19 @@ CREATE TABLE IF NOT EXISTS ${CASSANDRA_KEYSPACE}.event_reactions (
 
 CREATE INDEX IF NOT EXISTS ON ${CASSANDRA_KEYSPACE}.event_reactions (created_by);
 CREATE INDEX IF NOT EXISTS ON ${CASSANDRA_KEYSPACE}.event_reactions (like_value);
+
+CREATE TABLE IF NOT EXISTS ${CASSANDRA_KEYSPACE}.event_reviews (
+  event_id text,
+  created_at timestamp,
+  id uuid,
+  rating tinyint,
+  comment text,
+  created_by text,
+  updated_at timestamp,
+  PRIMARY KEY (event_id, created_at, id)
+) WITH CLUSTERING ORDER BY (created_at DESC, id ASC);
+
+CREATE INDEX IF NOT EXISTS ON ${CASSANDRA_KEYSPACE}.event_reviews (created_by);
 EOF
 
 echo "Cassandra schema initialized successfully."

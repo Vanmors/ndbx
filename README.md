@@ -11,15 +11,16 @@ Backend-сервис платформы мероприятий для практ
 - **Аутентификация** — `POST /auth/login`, `POST /auth/logout`
 - **Управление мероприятиями** — создание, просмотр, обновление, фильтрация
 - **Реакции на мероприятия** — лайки и дизлайки (`POST /events/{id}/like`, `POST /events/{id}/dislike`)
-- **Кэширование реакций** — Redis (Cache-Aside) + Cassandra как основное хранилище
+- **Отзывы на мероприятия** — создание, просмотр, редактирование (`/events/{id}/reviews`)
+- **Кэширование реакций и отзывов** — Redis (Cache-Aside) + Cassandra как основное хранилище
 - **Health-check** — `GET /health`
 
 ## Технологии
 
 - Spring Boot 3.5+
 - MongoDB 8.0 — шардированный кластер для хранения пользователей и мероприятий
-- Redis 8.0 — сессии и кэш реакций
-- Apache Cassandra 4.1 — хранение реакций (лайков/дизлайков)
+- Redis 8.0 — сессии, кэш реакций и отзывов
+- Apache Cassandra 4.1 — хранение реакций (лайков/дизлайков) и отзывов
 - Docker + docker-compose
 - Makefile
 
@@ -36,12 +37,16 @@ Backend-сервис платформы мероприятий для практ
 
 - Хранение сессий (`sid:{id}`) с TTL
 - Кэш реакций (`events:{md5(title)}:reactions`) с TTL
+- Кэш отзывов (`event:{md5(title)}:reviews`) с TTL
 
 ### Cassandra
 
 - Таблица `event_reactions` (keyspace: `testkeyspace`)
-- Partition key: `event_id`, clustering key: `created_by`
-- Поля: `event_id`, `created_by`, `like_value` (1 — лайк, -1 — дизлайк), `created_at`
+  - Partition key: `event_id`, clustering key: `created_by`
+  - Поля: `event_id`, `created_by`, `like_value` (1 — лайк, -1 — дизлайк), `created_at`
+- Таблица `event_reviews` (keyspace: `testkeyspace`)
+  - Partition key: `event_id`, clustering keys: `created_at` DESC, `id`
+  - Поля: `event_id`, `id` (UUID), `rating` (1-5), `comment`, `created_by`, `created_at`, `updated_at`
 
 ## API
 
@@ -61,7 +66,7 @@ Backend-сервис платформы мероприятий для практ
 | POST | `/users` | Регистрация |
 | GET | `/users` | Список пользователей (фильтры: `name`, `id`) |
 | GET | `/users/{id}` | Пользователь по ID |
-| GET | `/users/{id}/events` | Мероприятия пользователя (`?include=reactions`) |
+| GET | `/users/{id}/events` | Мероприятия пользователя (`?include=reactions,reviews`) |
 
 ### Мероприятия
 
@@ -69,10 +74,13 @@ Backend-сервис платформы мероприятий для практ
 |-------|----------|----------|
 | POST | `/events` | Создать мероприятие |
 | GET | `/events` | Список мероприятий (фильтры: `title`, `category`, `city`, `price_from/to`, `date_from/to`) |
-| GET | `/events/{id}` | Мероприятие по ID (`?include=reactions`) |
+| GET | `/events/{id}` | Мероприятие по ID (`?include=reactions,reviews`) |
 | PATCH | `/events/{id}` | Обновить мероприятие |
 | POST | `/events/{id}/like` | Лайк |
 | POST | `/events/{id}/dislike` | Дизлайк |
+| POST | `/events/{id}/reviews` | Оставить отзыв (один пользователь — один отзыв) |
+| GET | `/events/{id}/reviews` | Список отзывов (пагинация: `limit`, `offset`) |
+| PATCH | `/events/{id}/reviews/{review_id}` | Редактировать отзыв (только владелец) |
 
 Параметры пагинации: `limit` (по умолчанию 10), `offset` (по умолчанию 0).
 
@@ -85,6 +93,7 @@ Backend-сервис платформы мероприятий для практ
 - `APP_HOST` — хост сервиса
 - `APP_USER_SESSION_TTL` — TTL сессии (сек)
 - `APP_LIKE_TTL` — TTL кэша реакций (сек)
+- `APP_EVENT_REVIEWS_TTL` — TTL кэша отзывов (сек, по умолчанию 120)
 
 ### Redis
 - `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB`
@@ -111,3 +120,4 @@ make services  # Статус сервисов
 ## Помощь
 
 Возникли вопросы? → [@Vanmrkv](https://t.me/Vanmrkv)
+

@@ -1,11 +1,10 @@
 package com.vanmors.ndbx.controller;
 
 import com.vanmors.ndbx.controller.response.ErrorResponse;
+import com.vanmors.ndbx.service.exception.AlreadyExistsException;
 import com.vanmors.ndbx.service.exception.RegistrationException;
 import com.vanmors.ndbx.service.exception.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.ConstraintViolationException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -34,6 +33,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RegistrationException.class)
     public ResponseEntity<ErrorResponse> handleConflictRegistration(final RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(AlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleAlreadyExists(final AlreadyExistsException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
     }
 

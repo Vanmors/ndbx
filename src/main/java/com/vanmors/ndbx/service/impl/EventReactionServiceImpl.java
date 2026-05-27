@@ -1,7 +1,9 @@
 package com.vanmors.ndbx.service.impl;
 
 
+import com.vanmors.ndbx.dao.EventNodeRepository;
 import com.vanmors.ndbx.dao.EventReactionRepository;
+import com.vanmors.ndbx.dao.UserNodeRepository;
 import com.vanmors.ndbx.dto.ReactionsCountDto;
 import com.vanmors.ndbx.entity.Event;
 import com.vanmors.ndbx.entity.EventReaction;
@@ -34,16 +36,22 @@ public class EventReactionServiceImpl implements EventReactionService {
     private final EventReactionRepository cassandraRepo;
     private final EventService eventService;
     private final JedisPooled reactionsCache;
+    private final EventNodeRepository eventNodeRepository;
+    private final UserNodeRepository userNodeRepository;
 
     @Value("${app.like.ttl-seconds}")
     private long likeTtlSeconds;
 
     public EventReactionServiceImpl(final EventReactionRepository cassandraRepo,
                                     final JedisPooled reactionsCache,
-                                    final EventService eventService) {
+                                    final EventService eventService,
+                                    final EventNodeRepository eventNodeRepository,
+                                    final UserNodeRepository userNodeRepository) {
         this.cassandraRepo = cassandraRepo;
         this.reactionsCache = reactionsCache;
         this.eventService = eventService;
+        this.eventNodeRepository = eventNodeRepository;
+        this.userNodeRepository = userNodeRepository;
     }
 
     @Override
@@ -51,6 +59,10 @@ public class EventReactionServiceImpl implements EventReactionService {
         final Event event = eventService.findByIdForReaction(eventId);
         saveReaction(eventId, userId, (byte) 1);
         refreshReactionsCacheByTitle(event.getTitle());
+
+        userNodeRepository.mergeByMongoId(userId);
+        eventNodeRepository.mergeByMongoId(eventId, event.getTitle());
+        eventNodeRepository.createLikedRelationship(userId, eventId);
     }
 
     @Override

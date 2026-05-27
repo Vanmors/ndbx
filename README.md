@@ -107,6 +107,13 @@ Backend-сервис платформы мероприятий для практ
 - `CASSANDRA_USERNAME`, `CASSANDRA_PASSWORD`
 - `CASSANDRA_CONSISTENCY`, `CASSANDRA_LOCAL_DATACENTER`
 
+## Документация API
+
+После запуска проекта доступна автогенерируемая документация:
+
+- **Swagger UI**: `http://localhost:8081/swagger-ui.html`
+- **OpenAPI JSON**: `http://localhost:8081/v3/api-docs`
+
 ## Запуск
 
 ```bash

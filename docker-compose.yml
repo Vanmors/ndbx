@@ -22,6 +22,8 @@ services:
         condition: service_completed_successfully
       cassandra-init:
         condition: service_completed_successfully
+      neo4j:
+        condition: service_healthy
 
   redis:
     image: redis:8.0-alpine
@@ -120,6 +122,23 @@ services:
     restart: "no"
 
 
+  neo4j:
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
+    ports:
+      - "${NEO4J_HTTP_PORT}:${NEO4J_HTTP_PORT}"
+      - "${NEO4J_BOLT_PORT}:${NEO4J_BOLT_PORT}"
+    volumes:
+      - neo4j_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${NEO4J_HTTP_PORT} || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   cassandra-test:
     image: cassandra:4.1
     env_file:
@@ -153,3 +172,4 @@ volumes:
   shard2a_data:
   shard2b_data:
   shard2c_data:
+  neo4j_data:

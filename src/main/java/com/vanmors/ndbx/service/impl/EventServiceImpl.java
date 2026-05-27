@@ -1,5 +1,6 @@
 package com.vanmors.ndbx.service.impl;
 
+import com.vanmors.ndbx.dao.EventNodeRepository;
 import com.vanmors.ndbx.dao.EventRepository;
 import com.vanmors.ndbx.dto.EventDto;
 import com.vanmors.ndbx.dto.EventPatchDto;
@@ -39,6 +40,8 @@ public class EventServiceImpl implements EventService {
 
     final private EventRepository eventRepository;
 
+    final private EventNodeRepository eventNodeRepository;
+
     final private UserService userService;
 
     final private SessionService sessionService;
@@ -47,10 +50,12 @@ public class EventServiceImpl implements EventService {
 
     @Autowired
     public EventServiceImpl(final EventRepository eventRepository,
+                            final EventNodeRepository eventNodeRepository,
                             final SessionService sessionService,
                             final MongoTemplate mongoTemplate,
                             final UserService userService) {
         this.eventRepository = eventRepository;
+        this.eventNodeRepository = eventNodeRepository;
         this.sessionService = sessionService;
         this.mongoTemplate = mongoTemplate;
         this.userService = userService;
@@ -73,7 +78,11 @@ public class EventServiceImpl implements EventService {
 
         sessionService.createOrRefreshSession(sid);
 
-        return eventRepository.save(event);
+        final Event saved = eventRepository.save(event);
+
+        eventNodeRepository.mergeByMongoId(saved.getId(), saved.getTitle());
+
+        return saved;
     }
 
     private static Event getEvent(final EventDto eventDto, final String userId) {

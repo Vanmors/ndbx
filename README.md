@@ -13,14 +13,16 @@ Backend-сервис платформы мероприятий для практ
 - **Реакции на мероприятия** — лайки и дизлайки (`POST /events/{id}/like`, `POST /events/{id}/dislike`)
 - **Отзывы на мероприятия** — создание, просмотр, редактирование (`/events/{id}/reviews`)
 - **Кэширование реакций и отзывов** — Redis (Cache-Aside) + Cassandra как основное хранилище
+- **Рекомендации мероприятий** — collaborative filtering на основе лайков через Neo4j, кэширование в Redis (Cache-Aside с TTL)
 - **Health-check** — `GET /health`
 
 ## Технологии
 
 - Spring Boot 3.5+
 - MongoDB 8.0 — шардированный кластер для хранения пользователей и мероприятий
-- Redis 8.0 — сессии, кэш реакций и отзывов
+- Redis 8.0 — сессии, кэш реакций, отзывов и рекомендаций
 - Apache Cassandra 4.1 — хранение реакций (лайков/дизлайков) и отзывов
+- Neo4j 5 — граф рекомендаций (связи лайков между пользователями и мероприятиями)
 - Docker + docker-compose
 - Makefile
 
@@ -38,6 +40,7 @@ Backend-сервис платформы мероприятий для практ
 - Хранение сессий (`sid:{id}`) с TTL
 - Кэш реакций (`events:{md5(title)}:reactions`) с TTL
 - Кэш отзывов (`event:{md5(title)}:reviews`) с TTL
+- Кэш рекомендаций (`user:{user_id}:recomms`) с TTL — HSET с полем `events`
 
 ### Cassandra
 
@@ -47,6 +50,22 @@ Backend-сервис платформы мероприятий для практ
 - Таблица `event_reviews` (keyspace: `testkeyspace`)
   - Partition key: `event_id`, clustering keys: `created_at` DESC, `id`
   - Поля: `event_id`, `id` (UUID), `rating` (1-5), `comment`, `created_by`, `created_at`, `updated_at`
+
+### Neo4j — граф рекомендаций
+
+- Один инстанс (community edition)
+- Узел `User` — `id` (идентификатор в MongoDB)
+- Узел `Event` — `id` (идентификатор в MongoDB), `title`
+- Связь `(User)-[:LIKED]->(Event)` — пользователь лайкнул мероприятие
+- Граф строится при создании пользователя, мероприятия или лайка
+- Дизлайки не удаляют связь `LIKED` из графа (в алгоритме рекомендаций учитываются только лайки)
+
+**Алгоритм рекомендаций (collaborative filtering):**
+1. Находим мероприятия, которые лайкнул пользователь
+2. Находим других пользователей, лайкнувших те же мероприятия
+3. Берём мероприятия, которые лайкнули эти пользователи, исключая уже лайкнутые текущим пользователем
+4. Сортируем по количеству лайков (от наиболее популярных)
+5. Дедупликация по названию — оставляем ближайшее по дате начала
 
 ## API
 
@@ -82,6 +101,12 @@ Backend-сервис платформы мероприятий для практ
 | GET | `/events/{id}/reviews` | Список отзывов (пагинация: `limit`, `offset`) |
 | PATCH | `/events/{id}/reviews/{review_id}` | Редактировать отзыв (только владелец) |
 
+### Рекомендации
+
+| Метод | Эндпоинт | Описание |
+|-------|----------|----------|
+| GET | `/recommendations` | Рекомендованные мероприятия (только авторизованные) |
+
 Параметры пагинации: `limit` (по умолчанию 10), `offset` (по умолчанию 0).
 
 ## Настройка конфигурации
@@ -94,6 +119,7 @@ Backend-сервис платформы мероприятий для практ
 - `APP_USER_SESSION_TTL` — TTL сессии (сек)
 - `APP_LIKE_TTL` — TTL кэша реакций (сек)
 - `APP_EVENT_REVIEWS_TTL` — TTL кэша отзывов (сек, по умолчанию 120)
+- `APP_RECOMMENDATIONS_TTL` — TTL кэша рекомендаций (сек)
 
 ### Redis
 - `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB`
@@ -106,6 +132,11 @@ Backend-сервис платформы мероприятий для практ
 - `CASSANDRA_HOSTS`, `CASSANDRA_PORT`, `CASSANDRA_KEYSPACE`
 - `CASSANDRA_USERNAME`, `CASSANDRA_PASSWORD`
 - `CASSANDRA_CONSISTENCY`, `CASSANDRA_LOCAL_DATACENTER`
+
+### Neo4j
+- `NEO4J_URL` — URL подключения (bolt-протокол)
+- `NEO4J_USER` — пользователь
+- `NEO4J_PASSWORD` — пароль
 
 ## Документация API
 

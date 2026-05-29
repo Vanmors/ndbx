@@ -64,12 +64,12 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         final Map<String, Long> scoreMap = recommendations.stream()
                 .collect(Collectors.toMap(
-                        EventNodeRepository.RecommendationResult::getId,
+                        EventNodeRepository.RecommendationResult::getEventId,
                         EventNodeRepository.RecommendationResult::getScore,
                         Long::max));
 
         final List<String> eventIds = recommendations.stream()
-                .map(EventNodeRepository.RecommendationResult::getId)
+                .map(EventNodeRepository.RecommendationResult::getEventId)
                 .toList();
 
         final List<Event> events = eventRepository.findAllById(eventIds);

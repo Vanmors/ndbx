@@ -24,7 +24,7 @@ public interface EventNodeRepository extends Neo4jRepository<EventNode, Long> {
             WHERE NOT (u)-[:LIKED]->(rec)
             WITH DISTINCT rec
             MATCH (liker:User)-[:LIKED]->(rec)
-            RETURN rec.id AS id, COUNT(liker) AS score
+            RETURN rec.id AS eventId, COUNT(liker) AS score
             ORDER BY score DESC
             """)
     List<RecommendationResult> findRecommendations(@Param("userId") String userId);
@@ -35,8 +35,8 @@ public interface EventNodeRepository extends Neo4jRepository<EventNode, Long> {
             """)
     void createLikedRelationship(@Param("userId") String userId, @Param("eventId") String eventId);
 
-    interface RecommendationResult {
-        String getId();
-        Long getScore();
+    record RecommendationResult(String eventId, Long score) {
+        public String getEventId() { return eventId; }
+        public Long getScore() { return score; }
     }
 }

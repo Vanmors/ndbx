@@ -1,0 +1,116 @@
+// EventHub — схема данных
+
+Project EventHub {
+  database_type: 'NoSQL (Mongo + Cassandra + Neo4j + Redis)'
+  Note: '''
+      - MongoDB    — основное хранилище пользователей и мероприятий (шардированный кластер)
+      - Cassandra  — реакции и отзывы (event-партиционирование, write-heavy)
+      - Neo4j      — граф рекомендаций (User -[:LIKED]-> Event)
+      - Redis      — сессии и Cache-Aside для реакций/отзывов/рекомендаций
+  '''
+}
+
+// MongoDB
+
+Table users [headercolor: #0E7C66, note: 'MongoDB: db.users'] {
+  id            string  [pk, note: 'ObjectId']
+  full_name     string
+  username      string  [unique, not null]
+  password_hash string  [note: 'BCrypt, strength=10']
+  created_at    timestamp
+}
+
+Table events [headercolor: #0E7C66, note: 'MongoDB: db.events (sharded by created_by, hashed)'] {
+  id              string     [pk, note: 'ObjectId']
+  title           string     [note: 'индекс; составной индекс с created_by']
+  category        string     [note: 'enum: meetup, concert, exhibition, party, other']
+  price           bigint
+  description     text
+  location_city   string     [note: 'вложенный объект location']
+  location_addr   string
+  created_at      timestamp
+  created_by      string     [not null, note: 'shard key (hashed) → users.id']
+  started_at      timestamp
+  finished_at     timestamp
+  participant_ids "string[]" [note: 'индекс по элементам массива']
+}
+
+Ref: events.created_by > users.id
+
+// Cassandra
+
+Table event_reactions [headercolor: #B5651D, note: 'Cassandra keyspace: testkeyspace'] {
+  event_id   string    [note: 'PARTITION KEY']
+  created_by string    [note: 'CLUSTERING KEY; вторичный индекс']
+  like_value tinyint   [note: '1 = like, -1 = dislike; вторичный индекс']
+  created_at timestamp
+
+  indexes {
+    (event_id, created_by) [pk]
+  }
+}
+
+Table event_reviews [headercolor: #B5651D, note: 'Cassandra keyspace: testkeyspace'] {
+  event_id   string    [note: 'PARTITION KEY']
+  created_at timestamp [note: 'CLUSTERING KEY DESC']
+  id         uuid      [note: 'CLUSTERING KEY ASC']
+  rating     tinyint   [note: '1..5']
+  comment    text      [note: 'до 300 символов']
+  created_by string    [note: 'вторичный индекс']
+  updated_at timestamp
+
+  indexes {
+    (event_id, created_at, id) [pk]
+  }
+}
+
+Ref: event_reactions.event_id > events.id
+Ref: event_reactions.created_by > users.id
+Ref: event_reviews.event_id > events.id
+Ref: event_reviews.created_by > users.id
+
+// Neo4j
+
+Table user_nodes [headercolor: #3F4FAA, note: 'Neo4j label: User'] {
+  id string [pk, note: 'совпадает с users.id']
+}
+
+Table event_nodes [headercolor: #3F4FAA, note: 'Neo4j label: Event'] {
+  id    string [pk, note: 'совпадает с events.id']
+  title string
+}
+
+// Связь LIKED моделируется через таблицу-ассоциацию.
+Table liked [headercolor: #3F4FAA, note: 'Neo4j relation: (User)-[:LIKED]->(Event)'] {
+  user_id  string
+  event_id string
+
+  indexes {
+    (user_id, event_id) [pk]
+  }
+}
+
+Ref: liked.user_id  > user_nodes.id
+Ref: liked.event_id > event_nodes.id
+Ref: user_nodes.id  > users.id
+Ref: event_nodes.id > events.id
+
+// Redis
+
+Table redis_keys [headercolor: #C73E3E, note: 'Logical Redis namespace'] {
+  key      string [pk]
+  type     string [note: 'HSET / STRING']
+  ttl      int    [note: 'секунды']
+  purpose  string
+
+  indexes {
+    (key) [unique]
+  }
+
+  Note: '''
+    sid:<id>                              HSET   APP_USER_SESSION_TTL    — сессия (user_id, ...)
+    events:{md5(title)}:reactions         HSET   APP_LIKE_TTL            — кэш реакций
+    event:{md5(title)}:reviews            HSET   APP_EVENT_REVIEWS_TTL   — кэш отзывов
+    user:{user_id}:recomms                HSET   APP_RECOMMENDATIONS_TTL — кэш рекомендаций (поле events)
+  '''
+}

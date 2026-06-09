@@ -1,0 +1,701 @@
+openapi: 3.0.3
+info:
+  title: EventHub API
+  description: |
+    REST API сервиса EventHub — платформы мероприятий.
+
+    Сервис использует cookie-сессии: после первого обращения к `POST /session`
+    клиент получает cookie `X-Session-Id` (HttpOnly, SameSite=Lax). Авторизация
+    выполняется через `POST /auth/login` — сессия привязывается к пользователю.
+    Защищённые эндпоинты возвращают `401 Unauthorized`, если sid отсутствует
+    или не привязан к user_id в Redis.
+  version: 1.0.0
+  contact:
+    name: EventHub
+    url: https://github.com/Vanmors/ndbx
+
+servers:
+  - url: http://localhost:8081
+    description: Локальный запуск через docker-compose
+
+tags:
+  - name: session
+    description: Управление сессией и health-check
+  - name: auth
+    description: Аутентификация
+  - name: users
+    description: Пользователи
+  - name: events
+    description: Мероприятия
+  - name: reactions
+    description: Реакции (лайки/дизлайки)
+  - name: reviews
+    description: Отзывы
+  - name: recommendations
+    description: Рекомендации
+
+paths:
+  /health:
+    get:
+      tags: [session]
+      summary: Health-check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+  /session:
+    post:
+      tags: [session]
+      summary: Создать или обновить анонимную сессию
+      description: |
+        Если cookie `X-Session-Id` не передан или сессия в Redis истекла —
+        возвращает `201` с новым sid. Если сессия активна — возвращает `200`
+        и продлевает TTL.
+      parameters:
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200': { description: Сессия продлена, $ref: '#/components/responses/SessionCookieResponse' }
+        '201': { description: Создана новая сессия, $ref: '#/components/responses/SessionCookieResponse' }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Войти в аккаунт
+      parameters:
+        - $ref: '#/components/parameters/SessionCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              default:
+                value:
+                  username: "alice"
+                  password: "S3cret!"
+      responses:
+        '204': { description: OK, $ref: '#/components/responses/SessionCookieResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401':
+          description: Неверные учётные данные
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                bad:
+                  value: { message: "invalid credentials" }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Выйти из аккаунта
+      parameters:
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '204':
+          description: Сессия удалена, cookie очищен (Max-Age=0)
+
+  /users:
+    post:
+      tags: [users]
+      summary: Регистрация пользователя
+      parameters:
+        - $ref: '#/components/parameters/SessionCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserRegistrationRequest' }
+            examples:
+              default:
+                value:
+                  full_name: "Alice Liddell"
+                  username: "alice"
+                  password: "S3cret!"
+      responses:
+        '201': { description: Создан, $ref: '#/components/responses/SessionCookieResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409':
+          description: Имя пользователя занято
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    get:
+      tags: [users]
+      summary: Список пользователей
+      parameters:
+        - in: query
+          name: name
+          schema: { type: string }
+        - in: query
+          name: id
+          schema: { type: string }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsersResponse' }
+              examples:
+                default:
+                  value:
+                    users:
+                      - id: "65f8a1b2c3d4e5f6a7b8c9d0"
+                        full_name: "Alice Liddell"
+                        username: "alice"
+                    count: 1
+
+  /users/{id}:
+    get:
+      tags: [users]
+      summary: Получить пользователя по ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/events:
+    get:
+      tags: [users, events]
+      summary: Мероприятия пользователя
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/EventTitle'
+        - $ref: '#/components/parameters/EventCategory'
+        - $ref: '#/components/parameters/EventPriceFrom'
+        - $ref: '#/components/parameters/EventPriceTo'
+        - $ref: '#/components/parameters/EventCity'
+        - $ref: '#/components/parameters/EventDateFrom'
+        - $ref: '#/components/parameters/EventDateTo'
+        - $ref: '#/components/parameters/Include'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventsResponse' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /events:
+    post:
+      tags: [events]
+      summary: Создать мероприятие
+      description: Требует авторизации (sid → user_id).
+      parameters:
+        - $ref: '#/components/parameters/SessionCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventCreateRequest' }
+            examples:
+              default:
+                value:
+                  title: "Spring Boot Meetup"
+                  category: "meetup"
+                  price: 0
+                  description: "Доклады по Spring Boot и реактивному стеку"
+                  location:
+                    city: "Saint Petersburg"
+                    address: "ул. Большая Морская, 67"
+                  started_at: "2026-09-12T18:00:00Z"
+                  finished_at: "2026-09-12T21:00:00Z"
+      responses:
+        '201':
+          description: Создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, example: "65fb3d1e9a1c2b3d4e5f6a78" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      tags: [events]
+      summary: Список мероприятий с фильтрами
+      parameters:
+        - in: query
+          name: id
+          schema: { type: string }
+        - $ref: '#/components/parameters/EventTitle'
+        - $ref: '#/components/parameters/EventCategory'
+        - $ref: '#/components/parameters/EventPriceFrom'
+        - $ref: '#/components/parameters/EventPriceTo'
+        - $ref: '#/components/parameters/EventCity'
+        - $ref: '#/components/parameters/EventDateFrom'
+        - $ref: '#/components/parameters/EventDateTo'
+        - in: query
+          name: user
+          description: Username создателя
+          schema: { type: string }
+        - $ref: '#/components/parameters/Include'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventsResponse' }
+              examples:
+                default:
+                  value:
+                    events:
+                      - id: "65fb3d1e9a1c2b3d4e5f6a78"
+                        title: "Spring Boot Meetup"
+                        category: "meetup"
+                        price: 0
+                        description: "Доклады по Spring Boot и реактивному стеку"
+                        location:
+                          city: "Saint Petersburg"
+                          address: "ул. Большая Морская, 67"
+                        created_at: "2026-06-08T12:00:00Z"
+                        created_by: "65f8a1b2c3d4e5f6a7b8c9d0"
+                        started_at: "2026-09-12T18:00:00Z"
+                        finished_at: "2026-09-12T21:00:00Z"
+                        reactions: { likes: 42, dislikes: 3 }
+                        reviews: { count: 5, rating: 4.6 }
+                    count: 1
+
+  /events/{id}:
+    get:
+      tags: [events]
+      summary: Получить мероприятие по ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/Include'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [events]
+      summary: Обновить мероприятие
+      description: Требует авторизации; только владелец может обновлять.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/SessionCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventPatchRequest' }
+            examples:
+              default:
+                value:
+                  price: 1500
+                  city: "Moscow"
+      responses:
+        '204': { description: Обновлено }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /events/{id}/like:
+    post:
+      tags: [reactions]
+      summary: Поставить лайк
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '204': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /events/{id}/dislike:
+    post:
+      tags: [reactions]
+      summary: Поставить дизлайк
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '204': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /events/{id}/reviews:
+    post:
+      tags: [reviews]
+      summary: Оставить отзыв
+      description: Один пользователь может оставить только один отзыв к мероприятию.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/SessionCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewRequest' }
+            examples:
+              default:
+                value:
+                  comment: "Прекрасное событие, всё понравилось"
+                  rating: 5
+      responses:
+        '201':
+          description: Создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      tags: [reviews]
+      summary: Список отзывов мероприятия
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewsResponse' }
+              examples:
+                default:
+                  value:
+                    reviews:
+                      - id: "8b94c1d4-12f5-4f0b-9a4a-9c2d6c01f0aa"
+                        event_id: "65fb3d1e9a1c2b3d4e5f6a78"
+                        comment: "Прекрасное событие, всё понравилось"
+                        created_at: "2026-06-08T12:34:56Z"
+                        created_by: "65f8a1b2c3d4e5f6a7b8c9d0"
+                        rating: 5
+                        updated_at: "2026-06-08T12:34:56Z"
+                    count: 1
+
+  /events/{eventId}/reviews/{reviewId}:
+    patch:
+      tags: [reviews]
+      summary: Редактировать отзыв
+      description: Редактировать может только автор отзыва.
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: reviewId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/SessionCookie'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewPatchRequest' }
+            examples:
+              default:
+                value:
+                  rating: 4
+                  comment: "Хорошо, но звук подкачал"
+      responses:
+        '204': { description: Обновлено }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /recommendations:
+    get:
+      tags: [recommendations]
+      summary: Рекомендованные мероприятия
+      description: |
+        Collaborative filtering на Neo4j. Требует авторизации.
+        Результат кэшируется в Redis (`user:{user_id}:recomms`) с TTL `APP_RECOMMENDATIONS_TTL`.
+      parameters:
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendationsResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+components:
+  parameters:
+    SessionCookie:
+      in: cookie
+      name: X-Session-Id
+      description: Идентификатор сессии (HttpOnly cookie)
+      schema: { type: string }
+    Limit:
+      in: query
+      name: limit
+      schema: { type: integer, minimum: 0, default: 10 }
+    Offset:
+      in: query
+      name: offset
+      schema: { type: integer, minimum: 0, default: 0 }
+    Include:
+      in: query
+      name: include
+      description: |
+        Список включаемых блоков через запятую: `reactions`, `reviews`.
+        Например `?include=reactions,reviews`.
+      schema: { type: string }
+      example: "reactions,reviews"
+    EventTitle:
+      in: query
+      name: title
+      schema: { type: string }
+    EventCategory:
+      in: query
+      name: category
+      schema: { $ref: '#/components/schemas/Category' }
+    EventPriceFrom:
+      in: query
+      name: price_from
+      schema: { type: integer, format: int64 }
+    EventPriceTo:
+      in: query
+      name: price_to
+      schema: { type: integer, format: int64 }
+    EventCity:
+      in: query
+      name: city
+      schema: { type: string }
+    EventDateFrom:
+      in: query
+      name: date_from
+      description: Дата начала диапазона, формат `YYYYMMDD`
+      schema: { type: string, example: "20260101" }
+    EventDateTo:
+      in: query
+      name: date_to
+      description: Дата конца диапазона, формат `YYYYMMDD`
+      schema: { type: string, example: "20261231" }
+
+  responses:
+    SessionCookieResponse:
+      description: Ответ с обновлённой cookie `X-Session-Id`
+      headers:
+        Set-Cookie:
+          description: "`X-Session-Id=<sid>; Path=/; HttpOnly; SameSite=Lax`"
+          schema: { type: string }
+    ValidationError:
+      description: Ошибка валидации
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            default:
+              value: { message: "invalid username field" }
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Не найдено
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            default:
+              value: { message: "event not found" }
+    Conflict:
+      description: Конфликт состояний
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            default:
+              value: { message: "review already exists" }
+
+  schemas:
+    Category:
+      type: string
+      enum: [meetup, concert, exhibition, party, other]
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string, format: password }
+
+    UserRegistrationRequest:
+      type: object
+      required: [full_name, username, password]
+      properties:
+        full_name: { type: string }
+        username: { type: string }
+        password: { type: string, format: password }
+
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        full_name: { type: string }
+        username: { type: string }
+
+    UsersResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items: { $ref: '#/components/schemas/User' }
+        count: { type: integer, format: int64 }
+
+    Location:
+      type: object
+      properties:
+        city: { type: string }
+        address: { type: string }
+
+    EventCreateRequest:
+      type: object
+      required: [title, category, started_at, finished_at]
+      properties:
+        title: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        price: { type: integer, format: int64 }
+        description: { type: string }
+        location: { $ref: '#/components/schemas/Location' }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+
+    EventPatchRequest:
+      type: object
+      properties:
+        category: { $ref: '#/components/schemas/Category' }
+        price: { type: integer, format: int64 }
+        city: { type: string }
+
+    ReactionsCount:
+      type: object
+      properties:
+        likes: { type: integer, format: int64 }
+        dislikes: { type: integer, format: int64 }
+
+    ReviewsCount:
+      type: object
+      properties:
+        count: { type: integer, format: int64 }
+        rating: { type: number, format: double }
+
+    Event:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        price: { type: integer, format: int64 }
+        description: { type: string }
+        location: { $ref: '#/components/schemas/Location' }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        reactions: { $ref: '#/components/schemas/ReactionsCount' }
+        reviews: { $ref: '#/components/schemas/ReviewsCount' }
+
+    EventsResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/Event' }
+        count: { type: integer, format: int64 }
+
+    ReviewRequest:
+      type: object
+      required: [comment, rating]
+      properties:
+        comment: { type: string, maxLength: 300 }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+
+    ReviewPatchRequest:
+      type: object
+      properties:
+        comment: { type: string, maxLength: 300 }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+
+    Review:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        event_id: { type: string }
+        comment: { type: string }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        updated_at: { type: string, format: date-time }
+
+    ReviewsResponse:
+      type: object
+      properties:
+        reviews:
+          type: array
+          items: { $ref: '#/components/schemas/Review' }
+        count: { type: integer, format: int64 }
+
+    RecommendationsResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/Event' }
+
+    ErrorResponse:
+      type: object
+      properties:
+        message: { type: string }

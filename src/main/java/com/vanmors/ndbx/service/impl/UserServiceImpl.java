@@ -1,5 +1,6 @@
 package com.vanmors.ndbx.service.impl;
 
+import com.vanmors.ndbx.dao.UserNodeRepository;
 import com.vanmors.ndbx.dao.UserRepository;
 import com.vanmors.ndbx.dto.UserDto;
 import com.vanmors.ndbx.dto.UserRegistrationDto;
@@ -34,6 +35,8 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
 
+    private final UserNodeRepository userNodeRepository;
+
     private final PasswordEncoder passwordEncoder;
 
     private final SessionService sessionService;
@@ -42,10 +45,12 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     public UserServiceImpl(final UserRepository userRepository,
+                           final UserNodeRepository userNodeRepository,
                            final PasswordEncoder passwordEncoder,
                            final SessionService sessionService,
                            final MongoTemplate mongoTemplate) {
         this.userRepository = userRepository;
+        this.userNodeRepository = userNodeRepository;
         this.passwordEncoder = passwordEncoder;
         this.sessionService = sessionService;
         this.mongoTemplate = mongoTemplate;
@@ -63,6 +68,8 @@ public class UserServiceImpl implements UserService {
         user.setPasswordHashed(passwordEncoder.encode(dto.password()));
 
         final User saved = userRepository.save(user);
+
+        userNodeRepository.mergeByMongoId(saved.getId());
 
         // Создаём/обновляем сессию и привязываем user_id
         final String sid = sessionService.createOrRefreshSession(existingSid);
